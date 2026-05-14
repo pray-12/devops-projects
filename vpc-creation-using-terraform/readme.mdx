@@ -1,0 +1,135 @@
+# AWS Three-Tier Style Infrastructure Project using Terraform
+
+## Project Overview
+
+This project demonstrates how to provision a complete cloud infrastructure in AWS using Terraform.
+
+The architecture includes:
+
+* Custom VPC
+* Public Subnets across multiple Availability Zones
+* Internet Gateway
+* Route Tables
+* Security Groups
+* EC2 Instances
+* S3 Bucket
+* Application Load Balancer (ALB)
+* Target Groups
+* Listener Configuration
+* User Data automation
+
+This project represents a beginner-to-intermediate DevOps and Cloud Infrastructure deployment project and demonstrates Infrastructure as Code (IaC) concepts.
+
+# Architecture Diagram
+
+![Architecture Diagram](/images/architecture.png)
+
+## Additional Service
+
+The architecture also includes an Amazon S3 bucket used for object storage.
+
+### S3 Use Cases in This Project
+
+* Store application assets
+* Backup files
+* Store logs
+* Static website files
+* Terraform remote state (future enhancement)
+
+# Technologies Used
+
+| Technology      | Purpose                |
+| --------------- | ---------------------- |
+| AWS             | Cloud provider         |
+| Terraform       | Infrastructure as Code |
+| EC2             | Virtual servers        |
+| VPC             | Isolated cloud network |
+| ALB             | Load balancing         |
+| S3              | Object storage         |
+| Security Groups | Firewall rules         |
+| Linux User Data | Server bootstrapping   |
+
+# Project Implementation Steps
+
+## Step 1 — Create a Custom VPC
+- Created a VPC using a custom CIDR block
+- Established an isolated AWS network
+
+![](/vpc-creation-using-terraform/images/vpc.png)
+
+## Step 2 — Create Public Subnets
+- Created two public subnets in:
+  - ap-south-1a
+  - ap-south-1b
+- Enabled automatic public IP assignment
+
+![](/vpc-creation-using-terraform/images/subnets.png)
+
+## Step 3 — Configure Internet Gateway
+- Created and attached Internet Gateway to the VPC
+- Enabled internet access
+
+![](/vpc-creation-using-terraform/images/internet-gateway.png)
+## Step 4 — Configure Route Table
+- Created route table
+- Added route:
+  ```text
+  0.0.0.0/0 → Internet Gateway
+  ```
+
+## Step 5 — Associate Route Table with Subnets
+- Associated route table with both subnets
+- Converted them into public subnets
+
+## Step 6 — Create Security Group
+Allowed:
+- SSH (22)
+- HTTP (80)
+
+Allowed all outbound traffic.
+
+![](/vpc-creation-using-terraform/images/sg.png)
+
+## Step 7 — Launch EC2 Instances
+- Created two EC2 instances
+- Used User Data scripts for server configuration
+
+![](/vpc-creation-using-terraform/images/ec2.png)
+
+## Step 8 — Create S3 Bucket
+- Created S3 bucket for object storage
+- Used for assets and future enhancements
+
+## Step 9 — Create Application Load Balancer
+- Created internet-facing ALB
+- Attached both public subnets
+
+![](/vpc-creation-using-terraform/images/loadbalancer.png)
+
+## Step 10 — Create Target Group
+- Created target group
+- Configured health checks
+
+## Step 11 — Attach EC2 Instances
+- Attached both EC2 instances to target group
+
+## Step 12 — Create Listener
+- Configured HTTP listener on Port 80
+- Forwarded traffic to target group
+
+### Output
+
+![](/vpc-creation-using-terraform/images/output-lb-1.png)
+
+![](/vpc-creation-using-terraform/images/output-lb-2.png)
+
+# Conclusion
+
+This project demonstrates how to provision AWS infrastructure using Terraform with networking, EC2, S3, security groups, and Application Load Balancer configuration.
+
+It helped in understanding:
+- Infrastructure as Code (IaC)
+- AWS networking
+- High availability architecture
+- Load balancing
+- Cloud automation
