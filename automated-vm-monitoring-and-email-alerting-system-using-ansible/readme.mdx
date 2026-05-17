@@ -1,0 +1,522 @@
+# Automated VM Monitoring and Email Alerting System using Ansible
+
+This project demonstrates how to use **Ansible** to monitor multiple virtual machines and send automated reports.
+
+If we have multiple VMs that need to be monitored regularly. The goal is to collect system metrics such as **CPU usage, RAM usage, and disk utilization** from all the machines and generate a consolidated report.
+
+Finally, the report is sent to a specified email address, providing a clear overview of system health across all machines.
+
+This project showcases Ansible’s ability to handle **large-scale automation, remote monitoring, scheduling, and reporting** in a production-like environment.
+
+## Installation and Setup
+
+### Step 1: Launch Ansible Master Node
+
+Create an EC2 instance using AWS CLI (or console) with the following configuration:
+
+* **Instance Name:** Ansible-Master
+* **Operating System:** Ubuntu 20.04 LTS
+* **Instance Type:** t2.medium
+* **Key Pair:** ansible-key
+* **Ports:** 22 (SSH), 587 (SMTP for email)
+* **Storage:** 20 GB
+
+---
+
+### Step 2: Launch Target Instances
+
+Create multiple EC2 instances that will act as managed nodes:
+
+* **Instance Name:** web
+* **Tag:** Environment = dev
+* **Operating System:** Ubuntu 20.04 LTS
+* **Instance Type:** t2.small
+* **Key Pair:** Same as Ansible-Master
+* **Storage:** 20 GB
+* **Number of Instances:** 10
+
+### Step 3: Connect Master node with MObaxterm
+
+Use MObaxterm to connect to the Ansible Master node via SSH. Ensure you have the correct private key (`ansible-key.pem`) and the public IP address of the master node.
+
+1. Update and upgrade the system packages:
+
+```bash
+sudo apt update && sudo apt upgrade -y
+```
+2. Add the Ansible PPA
+
+```bash
+sudo add-apt-repository --yes --update ppa:ansible/ansible # Add Ansible PPA[What is PPA? A Personal Package Archive (PPA) is a software repository that allows developers to distribute their software directly to users. By adding a PPA, users can easily install and update software using their package manager, such as apt..]
+```
+3. Install Ansible
+
+```bash
+sudo apt install ansible -y
+```
+
+Once Ansible is installed, you can verify the installation by checking the version:
+
+```bash
+ansible --version
+```
+---
+ 
+### Step 4: Install AWS CLI
+
+```bash
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+sudo apt install unzip
+unzip awscliv2.zip
+sudo ./aws/install
+
+```
+
+Run this command
+```bash
+aws configure
+```
+and provide the Access key ID, Secret access key, region, and output format.
+
+Steps:
+
+1. Go to the AWS Management Console.
+2. CLick on security credentials in the dropdown menu of your account name.
+3. Click on Access keys and then Create access key.
+4. Note down the Access key ID and Secret access key or download the csv file.
+
+---
+### Step 5: Script to rename the instances
+
+```bash
+#!/bin/bash
+
+# Fetch instance IDs that match Environment=dev and Role=web
+instance_ids=$(aws ec2 describe-instances \
+  --filters "Name=tag:Environment,Values=dev" "Name=instance-state-name,Values=running" \
+  --query 'Reservations[*].Instances[*].InstanceId' \
+  --output text)
+
+# Sort instance IDs deterministically
+sorted_ids=($(echo "$instance_ids" | tr '\t' '\n' | sort))
+
+# Rename instances sequentially
+counter=1
+for id in "${sorted_ids[@]}"; do
+  name="web-$(printf "%02d" $counter)"
+  echo "Tagging $id as $name"
+  aws ec2 create-tags --resources "$id" \
+    --tags Key=Name,Value="$name"
+  ((counter++))
+done
+```
+
+To run the script, save it as `rename_instances.sh`, give it execute permissions, and run it:
+
+```bash
+sudo chmod +x rename_instances.sh
+./rename_instances.sh
+```
+
+### Step6: Establish the connection between Ansible Master and Target Instances
+
+1. Generate SSH key pair on the Ansible Master node:
+
+```bash
+ssh-keygen -t rsa -b 4096 -C "Ansible-Master"
+```
+2. Create an inventory file to list the target instances:
+
+`inventory/aws_ec2.yaml`
+
+```yaml
+plugin: amazon.aws.aws_ec2
+regions:
+  - ap-south-1
+filters:
+  tag:Environment: dev
+  instance-state-name: running
+compose:
+  ansible_host: public_ip_address
+keyed_groups:
+  - key: tags.Name
+    prefix: name
+  - key: tags.Environment
+    prefix: env 
+```
+
+#### Step 1: Install venv module if not already present
+
+```bash
+sudo apt install python3-venv -y
+```
+
+#### Step 2: Create a virtual environment
+
+```bash
+python3 -m venv ansible-env
+```
+
+#### Step 3: Activate it
+
+```bash
+source ansible-env/bin/activate
+```
+
+#### Step 4: Install required Python packages
+
+```bash
+pip install boto3 botocore docker
+
+ansible-galaxy collection install amazon.aws
+
+ansible-inventory -i inventory/aws_ec2.yaml --graph # list of ip addresses of the target instances
+```
+
+3. Copy the public key to the target instances:
+
+vi Devops-Shack.pem copy the content of the public key and run the following script to inject the public key into the authorized_keys of each target instance:
+```bash
+sudo chmod 400 DevOps-Shack.pem
+```
+
+ - Copy the public key to the target instances
+```bash
+#!/bin/bash
+
+# Define vars
+PEM_FILE="DevOps-Shack.pem"
+PUB_KEY=$(cat ~/.ssh/id_rsa.pub)
+USER="ubuntu"  # or ec2-user
+INVENTORY_FILE="inventory/aws_ec2.yaml"
+
+# Extract hostnames/IPs from dynamic inventory
+HOSTS=$(ansible-inventory -i $INVENTORY_FILE --list | jq -r '._meta.hostvars | keys[]')
+
+for HOST in $HOSTS; do
+  echo "Injecting key into $HOST"
+  ssh -o StrictHostKeyChecking=no -i $PEM_FILE $USER@$HOST "
+    mkdir -p ~/.ssh && \
+    echo \"$PUB_KEY\" >> ~/.ssh/authorized_keys && \
+    chmod 700 ~/.ssh && \
+    chmod 600 ~/.ssh/authorized_keys
+  "
+done
+```
+
+disable strict host key checking for the ssh command to avoid prompts when connecting to new hosts.
+
+`ansible.cfg`
+
+```bash
+[defaults]
+inventory = ./inventory/aws_ec2.yaml
+host_key_checking = False
+
+[ssh_connection]
+ssh_args = -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+```
+
+Now run 
+
+```bash
+sudo chmod 400 copy-public-key.sh
+
+./copy-public-key.sh
+```
+
+Now connect to the target instances using Ansible:
+
+```bash
+ssh ubuntu@<target_instance_ip> -i DevOps-Shack.pem
+or
+ssh ubuntu@<target_instance_ip>
+``` 
+
+### Step 7: Create Variables and Jinja2 Template
+
+`vi group_vars/all.yaml`
+
+```yaml
+smtp_server: "smtp.gmail.com"
+smtp_port: 587
+email_user: "pray12201@gmail.com"
+email_pass: "--"
+alert_recipient: "preethyray12@gmail.com"
+```
+
+add password in the email_pass variable and the recipient email address in the alert_recipient variable. https://myaccount.google.com/apppasswords
+
+`vi templates/report_email_animated.html.j2`
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f9fbfc;
+      padding: 32px;
+      color: #333;
+      max-width: 960px;
+      margin: auto;
+    }
+
+    h2 {
+      text-align: center;
+      color: #2e7d32;
+      font-size: 28px;
+      margin-bottom: 32px;
+      border-bottom: 2px solid #c8e6c9;
+      padding-bottom: 10px;
+    }
+
+    .summary {
+      text-align: center;
+      margin-bottom: 30px;
+      background-color: #e3f2fd;
+      border: 1px solid #bbdefb;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #0d47a1;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      background-color: #ffffff;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    th {
+      background-color: #1565c0;
+      color: white;
+      padding: 14px;
+      font-size: 14px;
+      text-align: center;
+    }
+
+    td {
+      padding: 14px;
+      font-size: 13px;
+      text-align: center;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    tr:hover td {
+      background-color: #f5faff;
+    }
+
+    .hostname a {
+      color: #1565c0;
+      text-decoration: none;
+      font-weight: bold;
+    }
+
+    .bar-container {
+      width: 100%;
+      background-color: #eee;
+      border-radius: 6px;
+      height: 10px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+
+    .bar {
+      height: 100%;
+      border-radius: 6px;
+    }
+
+    .cpu-bar { background-color: #ef5350; }
+    .mem-bar { background-color: #42a5f5; }
+    .disk-bar { background-color: #66bb6a; }
+
+    .label {
+      margin-top: 4px;
+      font-size: 12px;
+      color: #555;
+    }
+
+    .badge {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 12px;
+      display: inline-block;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .healthy { background-color: #43a047; }
+    .warning { background-color: #fbc02d; color: #000; }
+    .critical { background-color: #d32f2f; }
+
+    .footer {
+      text-align: center;
+      font-size: 12px;
+      margin-top: 24px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <h2>📊 Consolidated VM Health Report</h2>
+
+  <div class="summary">
+    📅 <b>{{ collected_metrics | length }} VMs</b> | 🔥 Avg CPU: {{ ((collected_metrics | map(attribute='cpu') | map('float') | sum | float) / (collected_metrics | length)) | round(2) }}% | 📥 Avg Mem: {{ ((collected_metrics | map(attribute='mem') | map('float') | sum | float) / (collected_metrics | length)) | round(2) }}% | 📦 Avg Disk: {{ ((collected_metrics | map(attribute='disk') | map('float') | sum | float) / (collected_metrics | length)) | round(2) }}%
+  </div>
+
+  <table>
+    <tr>
+      <th>🌐 Hostname</th>
+      <th>🔥 CPU Usage</th>
+      <th>📥 Memory Usage</th>
+      <th>📦 Disk Usage</th>
+    </tr>
+    {% for vm in collected_metrics %}
+    <tr>
+      <td class="hostname">
+        <a href="http://{{ vm.hostname }}" target="_blank">{{ vm.hostname }}</a>
+      </td>
+      <td>
+        {{ vm.cpu }}%
+        <div class="bar-container"><div class="bar cpu-bar" style="width: {{ vm.cpu }}%"></div></div>
+        {% if vm.cpu|float < 50 %}
+          <div class="badge healthy">Healthy</div>
+          <div class="label">Low</div>
+        {% elif vm.cpu|float < 80 %}
+          <div class="badge warning">Warning</div>
+          <div class="label">Moderate</div>
+        {% else %}
+          <div class="badge critical">Critical</div>
+          <div class="label">High</div>
+        {% endif %}
+      </td>
+      <td>
+        {{ vm.mem }}%
+        <div class="bar-container"><div class="bar mem-bar" style="width: {{ vm.mem }}%"></div></div>
+        {% if vm.mem|float < 50 %}<div class="label">Low</div>
+        {% elif vm.mem|float < 80 %}<div class="label">Moderate</div>
+        {% else %}<div class="label">High</div>{% endif %}
+      </td>
+      <td>
+        {{ vm.disk }}%
+        <div class="bar-container"><div class="bar disk-bar" style="width: {{ vm.disk }}%"></div></div>
+        {% if vm.disk|float < 50 %}<div class="label">Ample</div>
+        {% elif vm.disk|float < 80 %}<div class="label">Monitor</div>
+        {% else %}<div class="label">Full</div>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <div class="footer">
+    ⏱️ Report Generated on: {{ timestamp }}
+  </div>
+</body>
+</html>
+```
+### Step8: Collect Metrics and Send Email
+`collect_metrics.yaml`
+
+```yaml
+- name: Collect VM metrics
+  hosts: env_dev
+  become: true
+  gather_facts: true
+  tasks:
+
+    - name: Install sysstat (for mpstat)
+      apt:
+        name: sysstat # Install sysstat package to get mpstat command for CPU usage
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Install sysstat (RedHat/CentOS)
+      yum:
+        name: sysstat
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Get CPU usage via mpstat
+      shell: "mpstat 1 1 | awk '/Average/ && $NF ~ /[0-9.]+/ {print 100 - $NF}'"
+      register: cpu_usage
+
+    - name: Get memory usage
+      shell: "free | awk '/Mem/{printf(\"%.2f\", $3/$2 * 100.0)}'"
+      register: mem_usage
+
+    - name: Get disk usage
+      shell: "df / | awk 'NR==2 {print $5}' | tr -d '%'"
+      register: disk_usage
+
+    - name: Set metrics fact
+      set_fact:
+        vm_metrics:
+          hostname: "{{ inventory_hostname }}"
+          cpu: "{{ cpu_usage.stdout | float | round(2) }}"
+          mem: "{{ mem_usage.stdout | float | round(2) }}"
+          disk: "{{ disk_usage.stdout | float | round(2) }}"
+```
+
+`send_report.yaml`
+
+```yaml
+- name: Send consolidated VM report
+  hosts: localhost
+  gather_facts: true
+  vars:
+    collected_metrics: >-
+      {{
+        hostvars |
+        dict2items |
+        selectattr('value.vm_metrics', 'defined') |
+        map(attribute='value.vm_metrics') |
+        list
+      }}
+    timestamp: "{{ ansible_date_time.date }} {{ ansible_date_time.time }}"
+    subject_line: "📊 VM Report – {{ ansible_date_time.date }} {{ ansible_date_time.hour }}:{{ ansible_date_time.minute }}"
+  tasks:
+    - name: Send animated HTML report via email
+      mail:
+        host: "{{ smtp_server }}"
+        port: "{{ smtp_port }}"
+        username: "{{ email_user }}"
+        password: "{{ email_pass }}"
+        to: "{{ alert_recipient }}"
+        subject: "{{ subject_line }}"
+        body: "{{ lookup('template', 'templates/report_email_animated.html.j2') }}"
+        subtype: html
+```
+### Step 9: Schedule the Playbook 
+playbook.yaml
+
+```yaml
+- import_playbook: collect_metrics.yaml
+- import_playbook: send_report.yaml
+```
+
+### Step 10: Run the playbook
+```bash
+ansible-playbook playbook.yaml
+```
+
+## Conclusion
+
+This project demonstrates a complete **end-to-end DevOps automation solution using Ansible** to monitor multiple virtual machines and generate consolidated health reports. It automates the collection of key system metrics such as **CPU usage, memory usage, and disk utilization** from multiple managed nodes and converts them into a structured, centralized report.
+
+The solution also integrates **SMTP-based email automation**, enabling real-time and scheduled reporting to stakeholders without manual intervention. By using **Ansible dynamic inventory, Jinja2 templating, and scheduled playbooks**, the project ensures scalability, reusability, and consistency across infrastructure.
+
+Overall, this project showcases strong DevOps capabilities in:
+
+- Infrastructure automation using Ansible  
+- Multi-node server monitoring  
+- Configuration management at scale  
+- Automated reporting and email notifications  
+- Cloud-based VM orchestration (AWS EC2)
+
+This project can be further enhanced by integrating advanced monitoring tools like **Prometheus, Grafana, or AWS CloudWatch** for real-time visualization and alerting dashboards.
