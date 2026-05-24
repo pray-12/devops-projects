@@ -1,0 +1,433 @@
+# Automated VM Monitoring and Email Alerting System using Ansible
+
+# Interview Questions and Answers
+
+---
+
+# Project Introduction
+
+## 1. Explain your project.
+
+> “I implemented an automated VM monitoring system using Ansible where multiple EC2 instances were monitored for CPU, memory, and disk utilization. The collected metrics were consolidated into an HTML report using Jinja2 templates and automatically emailed to stakeholders using SMTP.”
+
+---
+
+# Basic Ansible Questions
+
+## 2. Why did you use Ansible for this project?
+
+> Ansible is agentless, easy to configure, uses SSH for communication, and is highly suitable for automation, configuration management, and orchestration across multiple servers.
+
+---
+
+## 3. What is agentless architecture in Ansible?
+
+> Agentless means Ansible does not require any software installation on target nodes. It communicates using SSH.
+
+---
+
+## 4. What are managed nodes?
+
+> Managed nodes are the target servers controlled by the Ansible master node.
+
+Example:
+- web-01
+- web-02
+- web-03
+
+---
+
+## 5. What is inventory in Ansible?
+
+> Inventory is a file or dynamic source containing the list of target servers managed by Ansible.
+
+---
+
+## 6. What is dynamic inventory?
+
+> Dynamic inventory automatically fetches server details from cloud providers like AWS instead of manually maintaining static IP addresses.
+
+---
+
+## 7. Why did you use AWS dynamic inventory?
+
+> Because EC2 IP addresses may change frequently. Dynamic inventory automatically discovers running instances using AWS tags.
+
+---
+
+# AWS Questions
+
+## 8. Which AWS services were used?
+
+- EC2
+- IAM
+- AWS CLI
+
+---
+
+## 9. Why did you use tags in EC2?
+
+> Tags help organize and filter instances dynamically.
+
+Example:
+
+```yaml
+tag:Environment: dev
+```
+
+---
+
+## 10. Why was IAM required?
+
+> IAM permissions were required for Ansible dynamic inventory to access EC2 instance details through AWS APIs.
+
+---
+
+## 11. What permissions are required for dynamic inventory?
+
+- ec2:DescribeInstances
+- ec2:DescribeTags
+
+---
+
+# SSH and Connectivity Questions
+
+## 12. How does Ansible connect to target servers?
+
+> Ansible connects using SSH.
+
+---
+
+## 13. Why did you generate SSH keys?
+
+> SSH keys allow passwordless authentication between the Ansible master and managed nodes.
+
+---
+
+## 14. What is StrictHostKeyChecking?
+
+> It is an SSH security feature that validates remote host authenticity.
+
+---
+
+## 15. Why disable StrictHostKeyChecking in your project?
+
+> To avoid manual confirmation prompts while connecting to multiple new EC2 instances automatically.
+
+---
+
+# Monitoring Questions
+
+## 16. Which metrics were collected?
+
+- CPU usage
+- Memory usage
+- Disk usage
+
+---
+
+## 17. How did you collect CPU usage?
+
+Using:
+
+```bash
+mpstat
+```
+
+Command:
+
+```bash
+mpstat 1 1
+```
+
+---
+
+## 18. How did you collect memory usage?
+
+Using:
+
+```bash
+free
+```
+
+Command:
+
+```bash
+free | awk '/Mem/{printf("%.2f", $3/$2 * 100.0)}'
+```
+
+---
+
+## 19. How did you collect disk usage?
+
+Using:
+
+```bash
+df -h
+```
+
+---
+
+# Playbook Questions
+
+## 20. What is a playbook?
+
+> A playbook is a YAML file containing automation tasks executed by Ansible.
+
+---
+
+## 21. How many playbooks did you create?
+
+- collect_metrics.yaml
+- send_report.yaml
+- playbook.yaml
+
+---
+
+## 22. What is gather_facts?
+
+> gather_facts collects system information automatically before task execution.
+
+---
+
+## 23. What is register in Ansible?
+
+> register stores task output into variables.
+
+Example:
+
+```yaml
+register: cpu_usage
+```
+
+---
+
+## 24. What is set_fact?
+
+> set_fact dynamically creates variables during playbook execution.
+
+---
+
+# Jinja2 Questions
+
+## 25. Why did you use Jinja2 templates?
+
+> Jinja2 was used to generate dynamic HTML email reports.
+
+---
+
+## 26. What is the advantage of Jinja2?
+
+- Dynamic content generation
+- Reusable templates
+- Cleaner automation logic
+
+---
+
+# Email Automation Questions
+
+## 27. How was email sent?
+
+> Email was sent using Ansible mail module through Gmail SMTP server.
+
+---
+
+## 28. Which SMTP port was used?
+
+```text
+587
+```
+
+---
+
+## 29. Why use Gmail App Password?
+
+> Google blocks less secure authentication, so App Password is required for SMTP automation.
+
+---
+
+# Scenario-Based Questions
+
+---
+
+# Scenario 1
+
+## One EC2 instance is unreachable. What happens?
+
+### Answer
+
+> Ansible marks that host as unreachable but continues execution for other reachable hosts.
+
+---
+
+# Scenario 2
+
+## CPU metrics are not showing properly.
+
+### Answer
+
+I would check:
+- sysstat package installation
+- mpstat command output
+- shell command syntax
+- permissions
+
+---
+
+# Scenario 3
+
+## Email report is not delivered.
+
+### Answer
+
+I would verify:
+- SMTP credentials
+- Internet connectivity
+- Gmail App Password
+- Firewall rules
+- Port 587 access
+
+---
+
+# Scenario 4
+
+## Dynamic inventory is not listing EC2 instances.
+
+### Answer
+
+I would check:
+- IAM permissions
+- AWS CLI configuration
+- Region configuration
+- Instance tags
+- Boto3 installation
+
+---
+
+# Scenario 5
+
+## Ansible cannot connect to target nodes.
+
+### Answer
+
+I would verify:
+- SSH connectivity
+- Security groups
+- Key permissions
+- Correct username
+- SSH daemon status
+
+---
+
+# Scenario 6
+
+## Memory usage command gives empty output.
+
+### Answer
+
+I would manually test the shell command and verify Linux compatibility.
+
+---
+
+# Scenario 7
+
+## HTML report formatting is broken.
+
+### Answer
+
+I would validate:
+- Jinja2 syntax
+- HTML structure
+- Variable rendering
+- CSS formatting
+
+---
+
+# Scenario 8
+
+## Some EC2 instances are missing in reports.
+
+### Answer
+
+I would check:
+- EC2 tags
+- Inventory filters
+- Instance running state
+- AWS API permissions
+
+---
+
+# Advanced Questions
+
+## 30. How can this project be improved?
+
+Possible improvements:
+- Prometheus integration
+- Grafana dashboards
+- Slack alerts
+- CloudWatch integration
+- Kubernetes monitoring
+
+---
+
+## 31. Why use Ansible over shell scripts?
+
+| Shell Script | Ansible |
+|---|---|
+| Hard to scale | Highly scalable |
+| Manual management | Automated |
+| Less reusable | Modular |
+| No inventory management | Inventory support |
+
+---
+
+## 32. What are the advantages of this project?
+
+- Centralized monitoring
+- Automated reporting
+- Scalable infrastructure management
+- Reduced manual effort
+- Cloud automation experience
+
+---
+
+# Commands Frequently Asked in Interview
+
+## Verify Ansible Installation
+
+```bash
+ansible --version
+```
+
+---
+
+## Run Playbook
+
+```bash
+ansible-playbook playbook.yaml
+```
+
+---
+
+## Test Connectivity
+
+```bash
+ansible all -m ping
+```
+
+---
+
+## Check Dynamic Inventory
+
+```bash
+ansible-inventory -i inventory/aws_ec2.yaml --graph
+```
+
+---
+
+# Key Learnings
+
+- Infrastructure Automation
+- Configuration Management
+- AWS EC2 Automation
+- Dyna
