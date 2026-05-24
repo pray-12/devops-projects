@@ -1,0 +1,343 @@
+# How to Explain the Project in Interview
+
+# Project Introduction
+
+> “I implemented an end-to-end CI/CD pipeline using Jenkins Freestyle Project for a Java-based web application. The pipeline automates source code integration, Maven build,artifact storage in AWS S3 and WAR file deployment to Apache Tomcat.”
+
+# Architecture Flow
+
+```text
+GitHub
+   ↓
+Jenkins
+   ↓
+Maven Build
+   ↓
+WAR Artifact Generated
+   ↓
+Upload WAR Artifact to S3
+   ↓
+Deploy WAR Artifact to Tomcat
+```
+
+# Step-by-Step Workflow Explanation
+
+## Step 1: Source Code Integration
+
+> “The application source code was stored in GitHub, and Jenkins was configured to pull the latest code from the repository.”
+
+### GitHub Repository
+
+```text
+https://github.com/KastroVKiran/tomcat-app-kastro.git
+```
+
+---
+
+# Step 2: Maven Build Process
+
+> “I configured Jenkins to execute Maven goals using `clean package`.”
+
+## Maven Command
+
+```bash
+clean package
+```
+
+### What It Does
+
+| Command | Purpose |
+|---|---|
+| clean | Removes previous build files |
+| package | Compiles code and creates WAR artifact |
+
+---
+
+# Step 3: WAR Artifact Generation
+
+> “After successful build, Maven generated the WAR artifact inside the `target/` directory.”
+
+Example:
+
+```text
+target/devops-training-portal.war
+```
+
+# Step 4: Artifact Upload to AWS S3
+
+> “After deployment, Jenkins uploaded the WAR artifact to AWS S3 using the S3 Publisher Plugin.”
+
+### S3 Benefits
+
+- Centralized artifact storage
+- Backup management
+- Version control
+- Rollback support
+
+# Step 5: S3 Versioning
+
+> “S3 versioning was enabled to maintain multiple versions of WAR artifacts.”
+
+This helps in:
+- rollback
+- backup recovery
+- artifact tracking
+
+# Step 6: Deployment to Apache Tomcat
+
+> “Using Jenkins Deploy to Container plugin, the generated WAR file was automatically deployed to Apache Tomcat running on port 9090.”
+
+### Tomcat Deployment URL
+
+```text
+http://<EC2-Public-IP>:9090
+```
+
+# Challenges Faced During the Project
+
+# Challenge 1: Jenkins Service Failed
+
+## Issue
+
+```text
+Jenkins service failed to start
+```
+
+## Root Cause
+
+Java compatibility issue.
+
+## Solution
+
+Installed Java 21 instead of Java 17.
+
+# Challenge 2: Tomcat Access Denied
+
+## Issue
+
+Tomcat manager page blocked remote access.
+
+## Solution
+
+Modified:
+
+```text
+context.xml
+```
+
+and updated:
+
+```xml
+allow="^.*$"
+```
+
+to allow remote access.
+
+# Challenge 3: S3 Upload Failed
+
+## Issue
+
+```text
+Access key ID cannot be blank
+```
+
+## Root Cause
+
+Jenkins S3 profile was not configured properly.
+
+## Solution
+
+Created IAM User and configured:
+- Access Key
+- Secret Key
+inside Jenkins S3 Profile.
+
+# Challenge 4: Invalid S3 Bucket Error
+
+## Issue
+
+```text
+The specified bucket is not valid
+```
+
+## Root Cause
+
+Bucket region mismatch.
+
+## Solution
+
+Configured correct AWS region in Jenkins.
+
+# Important Interview Questions
+
+---
+
+# Jenkins Questions
+
+## 1. Why did you use Jenkins?
+
+> Jenkins was used to automate build, deployment, and artifact management processes.
+
+## 2. What is a Freestyle Project?
+
+> Freestyle Project is Jenkins’ basic job type used to automate simple CI/CD workflows.
+
+## 3. What plugins were used?
+
+- Deploy to Container Plugin
+- S3 Publisher Plugin
+
+## 4. What happens when build fails?
+
+> Jenkins marks the build as failed and deployment/upload steps stop.
+
+# Maven Questions
+
+## 5. Why use Maven?
+
+> Maven automates dependency management and application packaging.
+
+## 6. What does `clean package` do?
+
+```bash
+clean package
+```
+
+- Removes old build files
+- Compiles application
+- Generates WAR artifact
+
+## 7. Where is WAR file stored?
+
+```text
+target/
+```
+# Tomcat Questions
+
+## 8. Why use Apache Tomcat?
+
+> Tomcat is used to deploy and run Java WAR applications.
+
+## 9. Why change Tomcat port from 8080 to 9090?
+
+> Jenkins was already using port 8080, so Tomcat was moved to 9090 to avoid port conflict.
+
+
+## 10. Why add `manager-script` role?
+
+> Jenkins requires `manager-script` permission to deploy applications remotely.
+
+# AWS S3 Questions
+
+## 11. Why store artifacts in S3?
+
+- Centralized storage
+- Backup
+- Version control
+- Easy rollback
+
+
+## 12. What is S3 versioning?
+
+> Versioning stores multiple versions of the same file inside S3 bucket.
+
+
+## 13. Why use IAM User/Role?
+
+> Jenkins requires AWS permissions to upload artifacts into S3.
+
+
+# Scenario-Based Interview Questions
+
+---
+
+# Scenario 1
+
+## Jenkins build succeeded but deployment failed. What will you check?
+
+### Answer
+
+I would check:
+- Tomcat server status
+- Tomcat credentials
+- Tomcat manager access
+- Network/Security Group rules
+- Jenkins deployment logs
+
+# Scenario 2
+
+## WAR file not generated after Maven build.
+
+### Answer
+
+I would verify:
+- `pom.xml`
+- Maven installation
+- Java version
+- Build logs
+- Project packaging type
+
+# Scenario 3
+
+## S3 upload failed with AccessDenied error.
+
+### Answer
+
+I would check:
+- IAM permissions
+- Access keys
+- Bucket policy
+- S3 profile configuration
+
+# Scenario 4
+
+## Jenkins service is not starting.
+
+### Answer
+
+I would check:
+- Java installation
+- Jenkins logs
+- Port conflicts
+- Service status
+
+Commands:
+
+```bash
+systemctl status jenkins
+journalctl -xeu jenkins.service
+```
+
+# Scenario 5
+
+## Tomcat application is not accessible after deployment.
+
+### Answer
+
+I would verify:
+- Tomcat running status
+- Security group inbound rules
+- Application deployment status
+- Port configuration
+- Tomcat logs
+
+# Scenario 6
+
+## Multiple builds are overwriting artifacts.
+
+### Answer
+
+I would enable S3 versioning to maintain multiple versions of WAR artifacts.
+
+# Scenario 7
+
+## Jenkins cannot connect to GitHub repository.
+
+### Answer
+
+I would verify:
+- Git installation
+- Repository URL
+- Internet access
+- GitHub credentials
+- Firewall rules

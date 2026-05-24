@@ -1,0 +1,393 @@
+# CI/CD Pipeline Using Jenkins, Maven, Tomcat, and AWS S3
+
+## Project Overview
+
+Implemented an end-to-end CI/CD pipeline for deploying a Java-based web application called **DevOps Training Portal - Batch 009** using Jenkins, Maven, Apache Tomcat, and AWS S3.
+
+The project focused on automating the build, deployment, and artifact management process in a Linux-based AWS environment.
+
+## Architecture Diagram
+
+![](/ci-cd-pipeline-using-jenkins-maven-tomcatserver-s3-bucket/images/architecture-diagram.png)
+
+## Technologies Used
+
+| Technology      | Purpose                |
+| --------------- | ---------------------- |
+| Jenkins         | CI/CD Automation       |
+| Maven           | Build Automation       |
+| Apache Tomcat   | Application Server     |
+| AWS S3          | Artifact Storage       |
+
+## Workflow
+
+1. Source code pulled from GitHub repository
+2. Jenkins triggered Maven build process
+3. WAR artifact generated inside `target/`
+4. Jenkins uploaded WAR artifact to AWS S3 bucket
+5. S3 versioning maintained multiple build artifacts
+6. Jenkins deployed WAR file to Apache Tomcat
+
+```bash
+GitHub
+   ↓
+Jenkins
+   ↓
+Maven Build
+   ↓
+WAR Artifact Generated
+   ↓
+Upload WAR Artifact to S3
+   ↓
+Deploy WAR Artifact to Tomcat
+```
+
+## Step by Step Implementation
+
+### Step 1: Install Jenkins
+
+```bash
+sudo dnf update -y
+
+sudo dnf install java-21-amazon-corretto-devel -y
+
+sudo wget -O /etc/yum.repos.d/jenkins.repo \
+https://pkg.jenkins.io/redhat-stable/jenkins.repo
+
+sudo rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+
+sudo dnf install jenkins -y
+
+sudo systemctl daemon-reload
+
+sudo systemctl enable jenkins
+
+sudo systemctl start jenkins
+
+sudo systemctl status jenkins
+```
+
+### Step 2: Install Git and Maven
+
+```bash
+sudo yum install git maven -y
+```
+### Step 3: Install Apache Tomcat
+
+```bash
+wget https://dlcdn.apache.org/tomcat/tomcat-9/v9.0.113/bin/apache-tomcat-9.0.113.tar.gz
+tar -xvf apache-tomcat-9.0.113.tar.gz
+cd apache-tomcat-9.0.113/bin
+./startup.sh
+```
+### Step 4: Change Tomcat Port from 8080 to 9090
+
+#### Update Port
+```bash
+sudo sed -i 's/port="8080"/port="9090"/' \
+apache-tomcat-9.0.113/conf/server.xml
+```
+
+#### Restart Tomcat
+```bash
+cd apache-tomcat-9.0.113/bin
+
+./shutdown.sh
+
+./startup.sh
+```
+
+### Step 5: Configure AWS Security Group
+
+Add inbound rules for:
+
+| Port | Purpose |
+| ---- | ------- |
+| 22   | SSH     |
+| 8080 | Jenkins |
+| 9090 | Tomcat  |
+
+![](/ci-cd-pipeline-using-jenkins-maven-tomcatserver-s3-bucket/images/sg.png)
+
+### Step 6: Configure Tomcat Manager Access
+
+#### Update manager/context.xml
+
+```bash
+echo '<Context antiResourceLocking="false" privileged="true">
+  <Valve className="org.apache.catalina.valves.RemoteAddrValve"
+         allow="^.*$" />
+</Context>' | sudo tee apache-tomcat-9.0.113/webapps/manager/META-INF/context.xml
+```
+
+#### Update host-manager/context.xml
+```bash
+echo '<Context antiResourceLocking="false" privileged="true">
+  <Valve className="org.apache.catalina.valves.RemoteAddrValve"
+         allow="^.*$" />
+</Context>' | sudo tee apache-tomcat-9.0.113/webapps/host-manager/META-INF/context.xml
+```
+
+#### Step 7: Configure Tomcat Users
+
+```bash
+echo '<?xml version="1.0" encoding="UTF-8"?>
+<tomcat-users xmlns="http://tomcat.apache.org/xml"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://tomcat.apache.org/xml tomcat-users.xsd"
+              version="1.0">
+
+  <role rolename="manager-gui"/>
+  <role rolename="admin-gui"/>
+  <role rolename="manager-script"/>
+
+  <user username="tomcat" password="tomcat" roles="manager-gui"/>
+
+  <user username="admin" password="admin"
+        roles="manager-gui,admin-gui,manager-script"/>
+
+</tomcat-users>' | sudo tee apache-tomcat-9.0.113/conf/tomcat-users.xml
+```
+#### Restart Tomcat
+
+```bash
+cd apache-tomcat-9.0.113/bin
+
+./shutdown.sh
+
+./startup.sh
+```
+**Note:**  To allow Jenkins to deploy applications into Tomcat, we must configure: **manager-script** role inside **tomcat-users.xml**.
+
+
+### Step 8: Install Deploy to Container Plugin and S3 Publisher Plugin
+
+Go to
+
+```bash
+Manage Jenkins → Plugins → Available Plugins
+```
+Search: 
+
+```bash
+Deploy to container and S3 Publisher
+```
+Install plugin and restart Jenkins.
+
+### Step 9: Create Jenkins Freestyle Job
+
+#### Configure SCM
+
+**GitHub Repository:**
+
+```bash
+https://github.com/KastroVKiran/tomcat-app-kastro.git
+```
+#### Build Step
+
+**Choose:**
+
+**Invoke top-level Maven targets**
+
+**Goals:**
+
+```bash
+clean package
+```
+
+This command generates WAR artifact inside:
+
+```bash
+target/
+```
+
+## Artifact Storage
+
+**Artifact Repository Tools**
+| Tool | Purpose |
+| ---- | ------- |
+| Nexus | Artifact Repository |
+| JFrog | Artifact Repository |
+| AWS S3 | Artifact Repository |
+
+This project uses: **Amazon S3** to store WAR artifacts.
+
+### Step 10: Create S3 Bucket
+
+Go to:
+
+```bash
+AWS Console → S3
+```
+**Create bucket.**
+
+**Example:**
+
+```bash
+ci-cd-project-5-24-2026
+```
+**Enable:**
+
+```bash
+Versioning
+```
+Versioning helps maintain multiple versions of the same WAR artifact.
+
+### Step 11: Configure IAM Access
+
+#### Create IAM Role
+
+Go to:
+
+```bash
+IAM → Roles → Create Role
+```
+
+**Choose:**
+
+```bash
+EC2
+```
+
+**Attach policy:**
+
+```bash
+AmazonS3FullAccess
+```
+
+Attach role to EC2 instance.
+
+#### Attach IAM Role to EC2
+
+Go to:
+
+```bash
+EC2 → Instance → Actions → Security → Modify IAM Role
+```
+
+Select IAM role and save.
+
+### Step 12: Configure S3 Profile
+
+Go to:
+
+```bash
+Manage Jenkins → System
+```
+
+**Scroll to:**
+
+```bash
+Amazon S3 profiles
+```
+
+**Add profile.**
+
+Example:
+
+| Field | Value |
+| ----- | ----- |
+| Profile Name | s3-profile |
+| Access Key | AWS Access Key |
+| Secret Key | AWS Secret Key |
+
+**Save configuration.**
+
+### Step 13: Upload WAR Artifact to S3
+
+**Post Build Action:**
+
+Choose:
+```bash
+Publish artifacts to S3 Bucket
+```
+| Field              | Value                   |
+| ------------------ | ----------------------- |
+| S3 Profile         | s3-profile              |
+| Source             | target/*.war            |
+| Destination Bucket | ci-cd-project-5-24-2026 |
+| Bucket Region      | us-east-1               |
+| Destination Path   | artifacts/              |
+
+#### Step 14: Deploy WAR File to Tomcat
+**Post Build Action:**
+
+**Choose:**
+
+**Deploy war/ear to a container**
+
+**Container:**
+
+Select:
+
+```bash
+Tomcat 9.x Remote
+```
+Tomcat URL
+
+```
+http://<EC2-Public-IP>:9090
+```
+**Credentials**
+
+Add:
+
+| Username | Password |
+| -------- | -------- |
+| admin    | admin    |
+
+
+Save and build project.
+
+## Output
+
+1. Build Succeeded
+![](/ci-cd-pipeline-using-jenkins-maven-tomcatserver-s3-bucket/images/build-suceeded.png)
+
+2. Application deployed to Apache Tomcat
+![](/ci-cd-pipeline-using-jenkins-maven-tomcatserver-s3-bucket/images/tomcat.png)
+
+3. WAR artifact uploaded to AWS S3 bucket
+![](/ci-cd-pipeline-using-jenkins-maven-tomcatserver-s3-bucket/images/s3.png)
+
+4. S3 versioning maintained multiple build artifacts
+![](/ci-cd-pipeline-using-jenkins-maven-tomcatserver-s3-bucket/images/s3-versioning.png)
+
+4. Access the Application
+![](/ci-cd-pipeline-using-jenkins-maven-tomcatserver-s3-bucket/images/access-application.png)
+
+
+## Responsibilities
+
+- Configured Jenkins Freestyle Project for CI/CD automation
+- Integrated GitHub repository with Jenkins
+- Automated Maven build process using `clean package`
+- Generated WAR artifacts and deployed them to Apache Tomcat 9
+- Configured Tomcat Manager and deployment settings
+- Implemented artifact storage in AWS S3 bucket using S3 Publisher Plugin
+- Enabled S3 versioning for artifact version management
+- Configured IAM Role/User permissions for Jenkins and S3 integration
+- Managed Jenkins, Maven, Git, and Tomcat setup on AWS EC2 instance
+- Configured Tomcat to run on custom port 9090
+
+## Conclusion
+
+- This project successfully implemented an end-to-end CI/CD pipeline using Jenkins, Maven, Apache Tomcat, and AWS S3.
+
+- The pipeline automated the complete application deployment workflow, including source code integration, Maven build execution, WAR artifact generation, deployment to Tomcat server, and artifact storage in Amazon S3.
+
+- Using Jenkins Freestyle Project, the manual deployment effort was significantly reduced and deployment consistency was improved.
+
+- AWS S3 versioning helped maintain multiple versions of application artifacts, enabling better artifact management and rollback support.
+
+- Through this project, hands-on experience was gained in:
+
+    - Jenkins CI/CD automation
+    - Maven build lifecycle
+    - Apache Tomcat deployment
+    - AWS S3 artifact storage
+    - IAM authentication and authorization
+    - GitHub integration
+    - Linux server administration
+
+- This project demonstrates practical knowledge of real-world DevOps workflows and deployment automation processes commonly used in production environments.
