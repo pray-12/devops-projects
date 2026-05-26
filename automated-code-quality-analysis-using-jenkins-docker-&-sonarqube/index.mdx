@@ -1,0 +1,372 @@
+# Automated Code Quality Analysis using Jenkins, Docker and SonarQube
+
+## Project Overview
+
+This project is a real-time DevOps CI/CD implementation designed to automate the complete software build, code quality analysis, containerization, and deployment process using Jenkins, SonarQube, Maven, and Docker.
+
+The primary objective of this project is to integrate automated code quality checks into the CI/CD pipeline and deploy the application inside a Docker container for easy portability and consistency across environments.
+
+The pipeline starts when the source code is pulled from a GitHub repository through Jenkins. Maven is then used to compile, test, and package the Java application. During the pipeline execution, SonarQube performs static code analysis to identify bugs, vulnerabilities, code smells, duplications, and maintainability issues in the application code.
+
+After successful code quality validation, Jenkins builds a Docker image for the application and pushes the image to Docker Hub. Finally, the Docker container is launched, allowing users to access the deployed application through the browser.
+
+This project demonstrates real-world DevOps practices such as:
+
+- Continuous Integration (CI)
+- Automated Build and Testing
+- Static Code Analysis
+- Continuous Delivery (CD)
+- Containerization using Docker
+- Pipeline Automation using Jenkins
+- Quality Gate Integration with SonarQube
+
+## Architecture Diagram
+![](/automated-code-quality-analysis-using-jenkins-docker-&-sonarqube/images/architecture-diagram.png)
+
+## Tools and Technologies Used
+
+| Tool | Purpose |
+|---|---|
+| Jenkins | CI/CD Automation Server |
+| Maven | Build and Dependency Management |
+| SonarQube | Static Code Quality Analysis |
+| Docker | Containerization Platform |
+| GitHub | Source Code Management |
+| Ubuntu EC2 | Hosting Environment |
+
+## Workflow of the Project
+
+1. Developer pushes code to GitHub.
+2. Jenkins pipeline gets triggered automatically.
+3. Maven compiles and tests the application.
+4. SonarQube performs code quality analysis.
+5. Maven packages the application.
+6. Jenkins builds the Docker image.
+7. Docker image is pushed to Docker Hub.
+8. Docker container is launched.
+9. Application becomes accessible through browser.
+
+## Installation and Setup Instructions
+
+### Step 1. Set up Jenkins on an Ubuntu EC2 instance.
+
+```bash
+sudo yum update -y
+sudo dnf install java-21-amazon-corretto -y
+java -version
+sudo wget -O /etc/yum.repos.d/jenkins.repo \
+https://pkg.jenkins.io/redhat-stable/jenkins.repo
+sudo rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+sudo yum install jenkins -y
+sudo systemctl start jenkins
+sudo systemctl enable jenkins
+sudo systemctl status jenkins
+```
+- Jenkins will run on port 8080. Add the port to the security group of the EC2 instance to allow access.
+- Access Jenkins through the browser using the public IP of the EC2 instance and port 8080 (e.g., http://\<EC2_PUBLIC_IP>:8080).
+
+### Step 2. Install maven, git and sonarqube using docker
+
+```bash
+sudo apt install maven -y
+sudo apt install git -y
+```
+
+```bash
+sudo yum update -y
+sudo yum install docker -y
+#Lets give permissions to run docker
+$ sudo chmod 666 /var/run/docker.sock
+sudo systemctl enable docker
+sudo systemctl start docker
+sudo usermod -aG docker ec2-user
+newgrp docker
+docker --version
+```
+```bash
+docker run -d \
+--name sonarqube \
+-p 9000:9000 \
+sonarqube:lts-community
+```
+- Open port 9000 in the security group of the EC2 instance to access SonarQube through the browser (e.g., http://\<EC2_PUBLIC_IP>:9000).
+- default credentials for SonarQube are:
+  - Username: admin
+  - Password: admin
+
+### Step 3: Install Required Jenkins Plugins
+
+Go to:
+
+```text
+Jenkins Dashboard
+→ Manage Jenkins
+→ Plugins
+→ Available Plugins
+```
+Search and install the following plugins:
+
+- SonarQube Scanner
+- Eclipse Temurin Installer
+- Pipeline Stage View
+
+After selecting plugins:
+
+```bash
+Install → Go back to the top of page
+```
+### Step 4: Configure JDK, Maven & SonarQube Scanner Tools
+
+Go to:
+
+```text
+Jenkins Dashboard
+→ Manage Jenkins
+→ Tools
+```
+#### 4.1 Configure JDK
+```bash
+Add JDK
+```
+| Field                 | Value         |
+| --------------------- | ------------- |
+| Name                  | jdk21         |
+| Install Automatically | ✓ Checked     |
+| Install from          | adoptium.net  |
+| Version               | jdk-21.0.1+12 |
+
+#### 4.2 Configure SonarQube Scanner
+
+Click:
+
+```bash
+Add SonarQube Scanner
+```
+
+| Field                 | Value                        |
+| --------------------- | ---------------------------- |
+| Name                  | sonar-scanner                |
+| Install Automatically | ✓ Checked                    |
+| Install from          | Maven Central                |
+| Version               | SonarQube Scanner 5.0.1.3006 |
+
+#### 4.3 Configure Maven
+Click:
+
+```bash
+Add Maven
+```
+
+| Field                 | Value     |
+| --------------------- | --------- |
+| Name                  | maven3    |
+| Install Automatically | ✓ Checked |
+| Install from          | Apache    |
+| Version               | 3.9.7     |
+
+### Step 5: Generate SonarQube Authentication Token
+Open SonarQube Console.
+
+Go to:
+
+```bash
+Administration
+→ Security
+→ Users
+```
+Under your user account:
+- Click on the **3 dots icon**
+- Select **Tokens**
+
+Create token:
+
+| Field      | Value   |
+| ---------- | ------- |
+| Name       | token   |
+| Expiration | 90 days |
+
+Click **Generate** and copy the generated token for later use in Jenkins configuration.
+
+### Step 6: Add SonarQube Token in Jenkins Credentials
+
+Go to:
+
+```bash
+Manage Jenkins
+→ Security
+→ Credentials
+→ Global
+→ Add Credentials
+```
+Configure:
+
+| Field       | Value                 |
+| ----------- | --------------------- |
+| Kind        | Secret text           |
+| Scope       | Global                |
+| Secret      | Paste SonarQube token |
+| ID          | sonar-token           |
+| Description | sonar-token           |
+Click **OK** to save the credential.
+
+### Step 7: Configure DockerHub Credentials
+Go to:
+
+```bash
+Manage Jenkins
+→ Credentials
+→ Global
+→ Add Credentials
+```
+| Field    | Value                             |
+| -------- | --------------------------------- |
+| Kind     | Username with password            |
+| Username | DockerHub Username                |
+| Password | DockerHub Password / Access Token |
+| ID       | dockerhub-credentials             |
+
+### Step 8: Configure SonarQube Server in Jenkins
+Go to:
+
+```bash
+Manage Jenkins
+  -> Configure System
+```
+Scroll to: 
+```bash
+SonarQube servers
+```
+Click **Add SonarQube** and configure:
+| Field                       | Value                   |
+| --------------------------- | ----------------------- |
+| Name                        | sonar-server            |
+| Server URL                  | http://\<Public-IP>:9000 |
+| Server Authentication Token | sonar-token             |
+
+### Step 9: Create Jenkins Pipeline Job
+Go to:
+
+```bash
+Jenkins Dashboard
+→ New Item
+```
+| Field     | Value                |
+| --------- | -------------------- |
+| Project  Name | SonarQube Project |
+| Type      | Pipeline             |
+
+### Step 10: Define Jenkins Pipeline Script
+```groovy
+pipeline {
+    agent any
+    
+    tools{
+        maven 'maven3'
+        jdk 'jdk21'
+    }
+    
+    environment {
+        SCANNER_HOME = tool 'sonar-scanner'
+        DOCKERHUB_USERNAME ='pray12'
+        DOCKER_IMAGE = "${DOCKERHUB_USERNAME}/spotify-app:latest"
+    }
+    stages {
+        stage('git checkout'){
+            steps {
+                git branch: 'main', url: 'https://github.com/pray-12/SonarQube-Project-Kastro.git'
+            }
+        }
+        stage ('compile'){
+            steps {
+                sh "mvn compile"
+            }
+        }
+        stage ('test'){
+            steps {
+                sh "mvn test"
+            }
+        }
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('sonar-server') {
+                    sh '''
+                    $SCANNER_HOME/bin/sonar-scanner \
+                    -Dsonar.projectName=PreethySonar \
+                    -Dsonar.projectKey=PreethyKey \
+                    -Dsonar.sources=. \
+                    -Dsonar.java.binaries=target
+                    '''
+                }
+            }
+        }
+        stage('build'){
+           steps{
+                sh 'mvn package'
+            }
+        }
+        stage('Docker Build') {
+            steps {
+                script {
+                    // Building Docker Image
+                    sh "docker build -t $DOCKER_IMAGE ."
+                }
+            }
+        }
+        stage('Docker Push to DockerHub') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKERHUB_USERNAME', passwordVariable: 'DOCKERHUB_PASSWORD')]) {
+                        echo "Docker Hub Username: ${DOCKERHUB_USERNAME}"  // Check the username
+                        echo "Docker Image: ${DOCKER_IMAGE}"  // Check the image
+                        sh "docker login -u ${DOCKERHUB_USERNAME} -p ${DOCKERHUB_PASSWORD}"
+                        sh "docker push $DOCKER_IMAGE"
+                    }
+                }
+            }
+        }
+
+        stage('Run Docker Container') {
+            steps {
+                script {
+                    // Stop any existing container with the same name
+                    sh "docker stop spotify-app || true && docker rm spotify-app || true"
+                    
+                    // Running the container
+                    sh "docker run -d --name spotify-app -p 5555:5555 $DOCKER_IMAGE"
+                }
+            }
+        }
+    }
+}
+```
+The docker file used in the project is as follows:
+```dockerfile
+FROM openjdk:17-jdk-slim
+WORKDIR /app
+COPY target/spotify-app-1.0.0.jar /app/spotify-app.jar
+EXPOSE 5555
+ENTRYPOINT ["java", "-jar", "spotify-app.jar"]
+```
+## Output and Results
+
+1. Pipeline execution in Jenkins showing successful stages for code checkout, compilation, testing, SonarQube analysis, Docker build, and Docker push.
+![](/automated-code-quality-analysis-using-jenkins-docker-&-sonarqube/images/architecture-diagram.pngimages/pipeline-success.png)
+
+2. SonarQube dashboard displaying code quality metrics, bugs, vulnerabilities, code smells, and maintainability issues for the project.
+![](/automated-code-quality-analysis-using-jenkins-docker-&-sonarqube/images/sonarqube.png)
+3. Docker Hub repository showing the pushed Docker image for the application.
+![](/automated-code-quality-analysis-using-jenkins-docker-&-sonarqube/images/docker-hub-image.png)
+4. Running Docker container accessible through the browser at http://\<EC2_PUBLIC_IP>:5555.
+![](/automated-code-quality-analysis-using-jenkins-docker-&-sonarqube/images/app.png)
+## Key Features
+
+- Automated CI/CD Pipeline
+- Real-time Code Quality Scanning
+- Containerized Application Deployment
+- Faster and Reliable Software Delivery
+- Reduced Manual Effort
+- Easy Scalability and Portability
+
+## Conclusion
+
+This project showcases an end-to-end DevOps CI/CD pipeline integrating Jenkins, SonarQube, Maven, and Docker to automate software delivery and maintain high code quality standards. It provides hands-on experience with industry-standard DevOps tools and demonstrates how automated pipelines improve software reliability, consistency, and deployment speed in real-world environments.
