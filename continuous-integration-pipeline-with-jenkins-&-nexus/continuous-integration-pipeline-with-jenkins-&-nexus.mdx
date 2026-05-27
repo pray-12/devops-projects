@@ -1,0 +1,272 @@
+## Continuous Integration Pipeline using Jenkins, Maven, and Nexus
+
+## Project Overview
+
+This project demonstrates an automated Continuous Integration (CI) pipeline for a Java Spring Boot application using Jenkins, Maven, and Nexus Repository.
+
+The pipeline automates the complete software build process starting from source code checkout to artifact storage in Nexus Repository. Developers push the application code to a GitHub repository, after which Jenkins automatically triggers the pipeline.
+
+## Features
+
+- Automated CI pipeline using Jenkins
+- Maven-based build and dependency management
+- Automated unit testing
+- JAR artifact generation
+- Artifact storage in Nexus Repository
+- Snapshot and Release repository management
+- Version-controlled build artifacts
+
+## Architecture Diagram
+
+![](/continuous-integration-pipeline-with-jenkins-&-nexus/images/architecture.png)
+### 1. Git Checkout
+Jenkins pulls the latest source code from the GitHub repository.
+
+### 2. Compile
+Maven compiles the Java Spring Boot application source code.
+
+### 3. Test
+JUnit test cases are executed automatically during the pipeline.
+
+### 4. Build
+Maven packages the application and generates the JAR artifact.
+
+### 5. Store Artifact
+The generated artifact is uploaded and stored in Nexus Repository for future usage.
+
+## Workflow
+
+```text
+Developer
+   ↓
+GitHub Repository
+   ↓
+Jenkins Pipeline
+   ↓
+Maven Compile
+   ↓
+Maven Test
+   ↓
+JAR Artifact Generation
+   ↓
+Store Artifact in Nexus Repository
+```
+
+## Step by Step Implementation
+
+### Step-1. Install Jenkins on an Ubuntu EC2 instance.
+
+```bash
+sudo apt update
+sudo apt install openjdk-21-jre-headless -y
+or 
+sudo apt install openjdk-21-jdk -y
+sudo wget -O /usr/share/keyrings/jenkins-keyring.asc \
+  https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc]" \
+  https://pkg.jenkins.io/debian-stable binary/ | sudo tee \
+  /etc/apt/sources.list.d/jenkins.list > /dev/null
+sudo apt-get update
+sudo apt-get install jenkins -y
+```
+### Step-2. Install Maven , Git, Docker and using docker install Nexus Repository.
+
+```bash
+sudo apt install maven -y
+sudo apt install git -y
+# Add Docker's official GPG key:
+sudo apt update
+sudo apt install ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+# Add the repository to Apt sources:
+sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+Components: stable
+Architectures: $(dpkg --print-architecture)
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+
+sudo apt update
+
+# install docker packages
+sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo systemctl status docker
+sudo systemctl start docker
+sudo docker run hello-world # to check if docker is installed successfully
+sudo usermod -aG docker jenkins # to add jenkins user to docker group which is used to run docker commands without sudo
+newgrp docker # to apply the changes to the current shell
+```
+
+Install Nexus Repository using docker:
+
+```bash
+docker run -d --name nexus3 -p 8081:8081 sonatype/nexus3
+docker ps # to check if nexus is running
+docker logs nexus3 # to check if nexus is running successfully
+```
+
+### Step-3. Add Ports to Security Group of the EC2 instance.
+
+```bash
+# Add inbound rules for:
+- 22: SSH
+- 8080: Jenkins
+- 8081: Nexus
+```
+
+### Step-4. Install Required Jenkins Plugins
+
+```bash
+Manage Jenkins → Plugins → Available Plugins
+
+Search and install the following plugins:
+- Config File Provider
+- Maven Integration
+- Eclipse Temurin Installer
+- Pipeline Stage View
+- Pipeline Maven Integration
+```
+## Config File Provider Plugin
+Used to securely manage configuration files like `settings.xml` inside Jenkins. It helps avoid storing sensitive configuration files in GitHub.
+
+---
+
+## Maven Integration Plugin
+Used to integrate Maven builds with Jenkins pipelines. It helps automate compile, test, package, and deploy stages.
+
+---
+
+## Eclipse Temurin Installer Plugin
+Used to automatically install and manage different Java versions in Jenkins. It helps projects use required JDK versions easily.
+
+---
+
+## Pipeline Stage View Plugin
+Used to visualize Jenkins pipeline stages graphically. It helps monitor pipeline progress and identify failed stages quickly.
+
+---
+
+## Pipeline Maven Integration Plugin
+Used to provide advanced Maven support inside Jenkins pipelines using `withMaven`. It automatically publishes reports and manages Maven execution.
+
+### Step-5. Global Tool Configuration
+
+```bash
+Manage Jenkins → Tools → Global Tool Configuration
+
+Configure the following tools:
+- JDK: jdk21
+- Maven: maven3
+```
+
+### Step-6. Add `Distribution Management` in `pom.xml` file.
+
+```xml
+<repository>
+    <id>maven-releases</id>
+    <url>http://54.197.185.201:8081/repository/maven-releases/</url>
+</repository>
+
+<snapshotRepository>
+    <id>maven-snapshots</id>
+    <url>http://54.197.185.201:8081/repository/maven-snapshots/</url>
+</snapshotRepository>
+```
+```bash
+go to Nexus UI -> Browse -> maven-releases & maven-snapshots -> copy the url and paste it in the pom.xml file.
+```
+
+### Step-7. Adding Credentials of Nexus to Jenkins[Settings.xml file].
+
+```bash
+Manage Jenkins -> Managed Files -> Add new config [left side] ->  Select `Global Maven Settings.xml` -> Scroll down to see the `id` -> Remove the existing `id` -> Rename to `settings.xml` -> next to see the `content` -> Paste the credentials of Nexus -> See <servers> in green color -> uncomment it till -->
+
+<Server>
+    <id>maven-releases</id>
+    <username>admin</username>
+    <password>admin123</password>
+</Server>
+<server>
+    <id>maven-snapshots</id>
+    <username>admin</username>
+    <password>admin123</password>
+</server>
+--> and save the file.
+```
+
+### Step-8. Create a Jenkins Pipeline Job
+
+```bash
+Jenkins Dashboard -> New Item -> Pipeline -> Name the job -> OK
+```
+
+Pipeline Script:
+
+```groovy
+pipeline {
+    agent any
+    tools {
+        maven 'maven3'
+    }
+    stages {
+        stage('Git Checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/KastroVKiran/Nexus-Demo.git'
+            }
+        }
+        stage('Compile') {
+            steps {
+                sh 'mvn compile'
+            }
+        }
+        stage('Tests') {
+            steps {
+                sh 'mvn test'
+            }
+        }
+        stage('Build') {
+            steps {
+                sh 'mvn package'
+            }
+        }
+        stage('Deploy Artifacts') {
+            steps {
+                withMaven(globalMavenSettingsConfig: 'settings.xml', jdk: 'jdk17', maven: 'maven3', mavenSettingsConfig: '', traceability: true) {
+                    sh 'mvn deploy'
+                }
+            }
+        }
+    }
+}
+```
+
+**Snippet of the Pipeline Script:**
+
+![](/continuous-integration-pipeline-with-jenkins-&-nexus/images/step-1.png)
+
+Build the job and check the output.
+
+### Step-9: Output
+
+1. Build Succeeded
+
+![](/continuous-integration-pipeline-with-jenkins-&-nexus/images/build.png)
+
+2. Artifact stored in Nexus Repository
+
+![](/continuous-integration-pipeline-with-jenkins-&-nexus/images/nexus.png)
+
+# Conclusion
+
+This project successfully demonstrates the implementation of a Continuous Integration (CI) pipeline using Jenkins, Maven, and Nexus Repository for a Java Spring Boot application.
+
+The pipeline automates the complete build process including source code checkout, compilation, testing, packaging, and artifact storage. By integrating Jenkins with Maven and Nexus Repository, the project achieves faster build automation, centralized artifact management, version control, and reduced manual effort.
+
+This project also provides hands-on experience with real-world DevOps practices such as CI pipeline creation, Maven build lifecycle management, Jenkins pipeline automation, Nexus artifact storage, and troubleshooting common build and deployment issues.
+
+Overall, the project helps understand how enterprise CI workflows are implemented to improve software delivery speed, reliability, and build consistency.

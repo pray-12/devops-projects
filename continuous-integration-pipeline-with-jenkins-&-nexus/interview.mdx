@@ -1,0 +1,130 @@
+# How to Explain the Project in Interview
+
+> “I worked on a Continuous Integration pipeline project for a Java Spring Boot application using Jenkins, Maven, and Nexus Repository. Whenever developers push code to GitHub, Jenkins automatically triggers the pipeline, performs compilation, testing, builds the JAR artifact using Maven, and stores the versioned artifact in Nexus Repository for centralized artifact management.”
+
+---
+
+# Interview Questions and Answers
+
+## 1. What was your role in the project?
+
+> “I was responsible for setting up the Jenkins CI pipeline, configuring Maven builds, integrating Nexus Repository for artifact storage, and automating the build workflow.”
+
+---
+
+## 2. Why did you use Jenkins?
+
+> “Jenkins was used to automate the CI pipeline including code checkout, build, testing, and artifact storage.”
+
+---
+
+## 3. Why did you use Maven?
+
+> “Maven was used for dependency management and automating the build lifecycle like compile, test, package, and deploy.”
+
+---
+
+## 4. Why Nexus Repository was used?
+
+> “Nexus Repository was used as a centralized artifact repository to store versioned JAR files generated from the pipeline.”
+
+---
+
+## 5. What is the difference between Snapshot and Release repository?
+
+> “Snapshot repositories store development or changing versions, whereas release repositories store stable and immutable production-ready artifacts.”
+
+---
+
+## 6. What happens when a developer pushes code to GitHub?
+
+> “Jenkins pulls the latest code from GitHub, executes Maven build stages, generates the JAR artifact, and uploads it to Nexus Repository.”
+
+---
+
+## 7. What is the use of `pom.xml`?
+
+> “`pom.xml` is the Maven configuration file that contains dependencies, plugins, Java version, and build configurations.”
+
+---
+
+## 8. Why did you configure `distributionManagement` in `pom.xml`?
+
+> “It is used to define Nexus repository URLs where Maven uploads release and snapshot artifacts.”
+
+---
+
+## 9. What is `mvn deploy`?
+
+> “`mvn deploy` uploads the generated Maven artifact to a remote repository like Nexus or Artifactory.”
+
+---
+
+## 10. What plugins did you use in Jenkins?
+
+> “I used Config File Provider, Maven Integration, Eclipse Temurin Installer, Pipeline Stage View, and Pipeline Maven Integration plugins.”
+
+---
+
+# Scenario-Based Interview Questions
+
+## 1. Pipeline build fails during compile stage. How will you troubleshoot?
+
+> “First, I will check Jenkins console logs to identify the exact error. Then I verify Java version compatibility, Maven dependencies, `pom.xml` configuration, and build plugins.”
+
+---
+
+## 2. Artifact upload to Nexus fails with 400 error.
+
+> “This usually happens when redeploying the same release version. I will either increase the version in `pom.xml` or use a `-SNAPSHOT` version.”
+
+---
+
+## 3. Jenkins says `JAVA_HOME not defined correctly`.
+
+> “I will verify JDK installation in Jenkins Global Tool Configuration and ensure the correct JDK is configured in the pipeline.”
+
+---
+
+## 4. Maven command works on server but fails in Jenkins.
+
+> “I will check Jenkins environment variables, Maven tool configuration, permissions, and whether Jenkins user has required access.”
+
+---
+
+## 5. Nexus is not accessible from browser.
+
+> “I will verify whether Nexus container/service is running, check port 8081 in the EC2 security group, and validate firewall/network settings.”
+
+---
+
+## 6. Pipeline stages after compile are skipped automatically.
+
+> “In Jenkins declarative pipelines, if one stage fails, downstream stages are skipped automatically unless handled explicitly.”
+
+---
+
+## 7. Same artifact version cannot be uploaded again.
+
+> “Release repositories in Nexus do not allow redeployment by default. We need to change the version or use snapshot repositories.”
+
+---
+
+# Important Final Interview Points
+
+## Key Concepts to Mention
+
+- Continuous Integration (CI)
+- Maven Lifecycle
+- Artifact Management
+- Nexus Repository
+- Jenkins Automation
+- Snapshot vs Release
+- Pipeline Stages
+- Build Automation
+
+---
+
+# One-Line Project Summary
+
+> “This project automates the complete CI workflow of a Spring Boot application using Jenkins, Maven, and Nexus Repository for automated build and centralized artifact management.”
