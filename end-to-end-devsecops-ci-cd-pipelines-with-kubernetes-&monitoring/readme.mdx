@@ -1,0 +1,861 @@
+# End-to-End DevSecOps CI/CD Pipelines with Kubernetes & Monitoring
+
+
+## Installation and Setup
+
+### Step 1: Create EC2 instance and attach security group to it.
+- Launch 1 instance with OS: 3GB , VM: 24.04 , Instance type: `m7i-flex.large` add security group to it. Also, create a key pair for the instances.
+- Connect to the instance using `mobaxterm`.
+
+**Security Group:**
+- 22: SSH
+- 8080: Jenkins
+- 8081: Nexus
+- 9000: SonarQube
+- 9090: Prometheus
+- 9091: Grafana
+- 9092: Alertmanager
+- 3000: Zomato App [in docker container]
+
+### Step 2: Update System Packages
+
+```bash
+sudo su # to become root user
+apt-get update -y
+```
+### Step 3: Install AWS CLI [to access AWS resources from the instance]
+
+```bash
+sudo apt install unzip -y
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+```
+### Step 4: Install Jenkins
+
+Install Jenkins from the official website: https://www.jenkins.io/doc/book/installing/linux/#debianubuntu
+
+```bash
+sudo apt update
+sudo apt install fontconfig openjdk-21-jre
+java -version
+sudo wget -O /etc/apt/keyrings/jenkins-keyring.asc \
+  https://pkg.jenkins.io/debian-stable/jenkins.io-2026.key
+echo "deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc]" \
+  https://pkg.jenkins.io/debian-stable binary/ | sudo tee \
+  /etc/apt/sources.list.d/jenkins.list > /dev/null
+sudo apt update
+sudo apt install jenkins
+sudo systemctl status jenkins
+sudo systemctl start jenkins
+sudo systemctl enable jenkins
+sudo systemctl status jenkins
+```
+Open the Jenkins dashboard in the browser using the public IP of the instance and port `8080`.
+
+### Step 5: Install Docker
+
+Install Docker from the official website: https://docs.docker.com/engine/install/ubuntu/
+
+```bash
+sudo apt remove $(dpkg --get-selections docker.io docker-compose docker-compose-v2 docker-doc podman-docker containerd runc | cut -f1)
+# Add Docker's official GPG key:
+sudo apt update
+sudo apt install ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+# Add the repository to Apt sources:
+sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+Components: stable
+Architectures: $(dpkg --print-architecture)
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+
+sudo apt update
+sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo systemctl status docker
+sudo systemctl start docker
+sudo docker run hello-world
+```
+
+### Step 6: Install Trivy for scanning the vulnerabilities in the system.
+
+https://trivy.dev/docs/latest/getting-started/installation/#debianubuntu-official
+
+```bash
+sudo apt-get install wget gnupg
+wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
+echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+sudo apt-get update
+sudo apt-get install trivy
+```
+### Step 7: Install docker scout for scanning the vulnerabilities in the system.
+
+1. Login to Docker Hub:
+2. Go to Mobaxterm and open the terminal.
+3. Run the following command to login to Docker Hub:
+```bash
+docker login -u <username> -p <password>
+```
+4. Install docker scout from the official website: https://docs.docker.com/scout/install/
+```bash
+curl -fsSL https://raw.githubusercontent.com/docker/scout-cli/main/install.sh -o install-scout.sh
+sh install-scout.sh
+sudo mv scout /usr/local/bin/
+scout --version
+chmod +x /usr/local/bin/docker.sock
+```
+### Step 8: Install SonarQube using docker.
+
+```bash
+docker run -d --name sonarqube -p 9000:9000 sonarqube:lts-community
+```
+- Open the SonarQube dashboard in the browser using the public IP of the instance and port `9000`.
+- default credentials for SonarQube are:
+    - Username: admin
+    - Password: admin
+
+### Step 9: Installation of Plugins in Jenkins
+
+```bash
+Manage Jenkins → Plugins → Available Plugins
+- Pipeline Stage View
+- Eclipse Temurin Installer
+- SonarQube Scanner
+- docker
+- docker commons
+- docker pipeline
+- docker API
+- docker build step
+- email extension template
+- Owasp dependency check
+- NodeJS
+- Prometheus metrics
+---
+
+### Step 10: Configure SonarQube , jdk , nodejs in Jenkins
+
+1.Go to Jenkins and add the token in the Jenkins Credentials.
+```bash
+Manage Jenkins → tools -> Sonarqube scanner installation -> Add Sonarqube scanner -> Name: sonar-scanner -> Version: recent version -> Save
+```
+2. Add JDK in Jenkins
+```bash
+Manage Jenkins → tools -> JDK installation -> Add JDK -> Name: jdk21 -> Version: recent version -> Save
+```
+3. Add NodeJS in Jenkins
+```bash
+Manage Jenkins → tools -> NodeJS installation -> Add NodeJS -> Name: node23 -> Version: recent version -> Save
+```
+4. Add Dependency Checker in Jenkins
+```bash
+Manage Jenkins → tools -> Dependency Checker installation -> Add Dependency Checker -> Name: DP-Check -> Version: recent version -> Save
+```
+5. Add docker in Jenkins
+
+```bash
+Manage Jenkins → tools -> docker installation -> Add docker -> Name: docker -> Version: recent version -> Save
+```
+6. Go to SonarQube dashboard and generate a token and copy it.
+```bash
+Administration → Security → Users → Tokens → Generate Token → Copy the token
+```
+- Add the token in the Jenkins Credentials.
+
+```bash
+Manage Jenkins → Credentials → Global → Add Credentials->secret text -> Paste the token -> ID: sonar-token -> Description: sonar-token -> Save
+```
+7. Configure dockerhub credentials in Jenkins
+```bash
+Manage Jenkins → Credentials → Global → Add Credentials->Username with password -> Paste the dockerhub credentials -> ID: docker -> Description: docker -> Save
+```
+
+8. Configuration of Email notification in Jenkins
+As soon as the build happens, i need to get an email notification to do that we have to configure our email.
+
+```bash
+Go to Gmail and generate an app password for Jenkins to send emails.
+copy the app password and paste it in the Jenkins Credentials.
+type-> username with password -> username: your email address -> password: app password [yuscpboqtaqizbxz]-> id: email-creds -> description: email-creds -> save
+Note: remove the spaces in the password.
+```
+9. Configure the sonarqube server in Jenkins
+```bash
+Manage Jenkins → Configure System → Sonarqube servers → Add Sonarqube server → Name: sonar-server → Server URL: http://<public-ip>:9000 → Server Authentication Token: sonar-token → Save
+```
+![](/end-to-end-devsecops-ci-cd-pipelines-with-kubernetes-&monitoring/images/sonar-config.png)
+10. Configure the email notification in Jenkins
+```bash
+Manage Jenkins → Configure System → Extended E-mail Notification → SMTP server: smtp.gmail.com → SMTP port: 465 → advance: Credentials: email-creds -> use ssl ->check -> use oauth -> save
+
+We need to configure here also
+E-mail Notification : SMTP server: smtp.gmail.com → advance-> use SMTP Authentication -> User name: your email address -> Password: app password [yuscpboqtaqizbxz] -> Use SSL: true -> Save
+
+Default trigger: [When build is successfull or failed we will get an email notification]
+```
+![](/end-to-end-devsecops-ci-cd-pipelines-with-kubernetes-&monitoring/images/build-triggers.png)
+
+11. Configure webhook in sonarqube 
+
+SonarQube webhook is used to send Quality Gate results back to Jenkins automatically. Based on the Quality Gate status, Jenkins marks the build as successful or failed. Then Jenkins email notification sends alerts to developers about the pipeline status.
+
+```bash
+Administration → Configuration → Webhooks → create → Name: jenkins -> URL: http://<public-ip>:8080/sonarqube-webhook/ -> create 
+```
+
+### Step-12: Write Jenkins Pipeline Script
+
+```bash
+pipeline {
+    agent any
+    tools {
+        jdk 'jdk21'
+        nodejs 'node26'
+    }
+    environment {
+        SCANNER_HOME=tool 'sonar-scanner'
+    }
+    stages {
+        stage ("clean workspace") {
+            steps {
+                cleanWs()
+            }
+        }
+        stage ("Git Checkout") {
+            steps {
+                git 'https://github.com/pray-12/DevOps-Project-Zomato-Kastro.git'
+            }
+        }
+        stage("Sonarqube Analysis"){
+            steps{
+                withSonarQubeEnv('sonar-server') {
+                    sh ''' $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=zomato-app \
+                    -Dsonar.projectKey=zomato-app '''
+                }
+            }
+        }
+        stage("Code Quality Gate"){
+           steps {
+                script {
+                    waitForQualityGate abortPipeline: false, credentialsId: 'sonar-token' 
+                }
+            } 
+        }
+        stage("Install NPM Dependencies") {
+            steps {
+                sh "npm install"
+            }
+        }
+        stage('OWASP FS SCAN') {
+            steps {
+                dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit -n', odcInstallation: 'DP-Check'
+                dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
+    }
+}
+        stage ("Trivy File Scan") {
+            steps {
+                sh "trivy fs . > trivy.txt"
+            }
+        }
+        stage ("Build Docker Image") {
+            steps {
+                sh "docker build -t zomato-app ."
+            }
+        }
+        stage ("Tag & Push to DockerHub") {
+            steps {
+                script {
+                    withDockerRegistry(credentialsId: 'docker') {
+                        sh "docker tag zomato-app pray12/zomato-app:latest "
+                        sh "docker push pray12/zomato-app:latest "
+                    }
+                }
+            }
+        }
+        stage('Docker Scout Image') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(
+                        credentialsId: 'docker',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )]) {
+        
+                        sh '''
+                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+        
+                        docker scout quickview pray12/zomato-app:latest
+                        docker scout cves pray12/zomato-app:latest
+                        docker scout recommendations pray12/zomato-app:latest
+                        '''
+                    }
+                }
+            }
+        }
+        stage ("Deploy to Container") {
+            steps {
+                sh 'docker run -d --name zomato-app -p 3000:3000 pray12/zomato-app:latest'
+            }
+        }
+    }
+    post {
+    always {
+        emailext attachLog: true,
+            subject: "'${currentBuild.result}'",
+            body: """
+                <html>
+                <body>
+                    <div style="background-color: #FFA07A; padding: 10px; margin-bottom: 10px;">
+                        <p style="color: white; font-weight: bold;">Project: ${env.JOB_NAME}</p>
+                    </div>
+                    <div style="background-color: #90EE90; padding: 10px; margin-bottom: 10px;">
+                        <p style="color: white; font-weight: bold;">Build Number: ${env.BUILD_NUMBER}</p>
+                    </div>
+                    <div style="background-color: #87CEEB; padding: 10px; margin-bottom: 10px;">
+                        <p style="color: white; font-weight: bold;">URL: ${env.BUILD_URL}</p>
+                    </div>
+                </body>
+                </html>
+            """,
+            to: 'pray122001@gmail.com',
+            mimeType: 'text/html',
+            attachmentsPattern: 'trivy.txt'
+        }
+    }
+}
+```
+
+```Dockerfile
+# Use Node.js 16 slim as the base image
+FROM node:16-slim
+
+# Set the working directory
+WORKDIR /app
+
+# Copy package.json and package-lock.json to the working directory
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy the rest of the application code
+COPY . .
+
+# Build the React app
+RUN npm run build
+
+# Expose port 3000 (or the port your app is configured to listen on)
+EXPOSE 3000
+
+# Start your Node.js server (assuming it serves the React app)  
+CMD ["npm", "start"]
+```
+
+Now once the build is successful, and if we try rerun the build, deploy to conatiner step will not work because the container is already running.
+
+We need to stop the container and then delete the container and then run the container again.
+
+```bash
+docker stop zomato-app
+docker rm zomato-app
+```
+
+## Monitoring of the application
+
+### Step 13: Launch a new instance  with name monitoring-server and attach security group to it.
+
+- 9090: Prometheus
+- 8080: Jenkins
+- 9100: Node Exporter
+- 3000: grafana
+
+We will install Grafana, Prometheus, Node Exporter in the above instance and then we will monitor
+
+- Connect to the monitoring-server instance using Mobaxterm.
+### Step 14: Install Prometheus
+First, create a dedicated Linux user for Prometheus and download Prometheus
+
+```bash
+sudo useradd --system --no-create-home --shell /bin/false prometheus
+wget https://github.com/prometheus/prometheus/releases/download/v2.47.1/prometheus-2.47.1.linux-amd64.tar.gz
+```
+
+Extract Prometheus files, move them, and create directories:
+```bash
+tar -xvf prometheus-2.47.1.linux-amd64.tar.gz
+cd prometheus-2.47.1.linux-amd64/
+sudo mkdir -p /data /etc/prometheus
+sudo mv prometheus promtool /usr/local/bin/
+sudo mv consoles/ console_libraries/ /etc/prometheus/
+sudo mv prometheus.yml /etc/prometheus/prometheus.yml
+```
+
+Set ownership for directories:
+```bash
+sudo chown -R prometheus:prometheus /etc/prometheus/ /data/
+```
+Create a systemd unit configuration file for Prometheus:
+```bash
+sudo vi /etc/systemd/system/prometheus.service
+```
+
+Add the following content to the prometheus.service file:
+
+```bash
+[Unit]
+Description=Prometheus
+Wants=network-online.target
+After=network-online.target
+
+StartLimitIntervalSec=500
+StartLimitBurst=5
+
+[Service]
+User=prometheus
+Group=prometheus
+Type=simple
+Restart=on-failure
+RestartSec=5s
+ExecStart=/usr/local/bin/prometheus \
+  --config.file=/etc/prometheus/prometheus.yml \
+  --storage.tsdb.path=/data \
+  --web.console.templates=/etc/prometheus/consoles \
+  --web.console.libraries=/etc/prometheus/console_libraries \
+  --web.listen-address=0.0.0.0:9090 \
+  --web.enable-lifecycle
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Explanation of the key elements in the above prometheus.service file:
+
+**User and Group** specify the Linux user and group under which Prometheus will run.
+
+**ExecStart** is where you specify the Prometheus binary path, the location of the configuration file (prometheus.yml), the storage directory, and other settings.
+
+**web.listen-address** configures Prometheus to listen on all network interfaces on port 9090.
+
+**web.enable-lifecycle** allows for management of Prometheus through API calls.
+
+
+Enable and start Prometheus:
+
+```bash
+sudo systemctl enable prometheus
+sudo systemctl start prometheus
+```
+Verify Prometheus's status:
+```bash
+sudo systemctl status prometheus
+```
+
+Press Control+c to come out
+
+Access Prometheus in browser using your server's IP and port 9090:
+```bash
+http://<your-server-ip>:9090
+```
+```bash
+Click on 'Status' dropdown ---> Click on 'Targets' ---> You can see 'Prometheus (1/1 up)'
+```
+
+### Step 15: Install Node Exporter
+
+```bash
+cd 
+You are in ~ path now
+```
+
+
+Create a system user for Node Exporter and download Node Exporter:
+```bash
+sudo useradd --system --no-create-home --shell /bin/false node_exporter
+wget https://github.com/prometheus/node_exporter/releases/download/v1.6.1/node_exporter-1.6.1.linux-amd64.tar.gz
+```
+
+Extract Node Exporter files, move the binary, and clean up:
+```bash
+tar -xvf node_exporter-1.6.1.linux-amd64.tar.gz
+sudo mv node_exporter-1.6.1.linux-amd64/node_exporter /usr/local/bin/
+rm -rf node_exporter*
+```
+Create a systemd unit configuration file for Node Exporter:
+```bash
+sudo vi /etc/systemd/system/node_exporter.service
+```
+
+Add the following content to the node_exporter.service file:
+
+```bash
+[Unit]
+Description=Node Exporter
+Wants=network-online.target
+After=network-online.target
+
+StartLimitIntervalSec=500
+StartLimitBurst=5
+
+[Service]
+User=node_exporter
+Group=node_exporter
+Type=simple
+Restart=on-failure
+RestartSec=5s
+ExecStart=/usr/local/bin/node_exporter --collector.logind
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Note: Replace --collector.logind with any additional flags as needed.
+
+```bash
+Enable and start Node Exporter:
+sudo systemctl enable node_exporter
+sudo systemctl start node_exporter
+```
+
+Verify the Node Exporter's status:
+```bash
+sudo systemctl status node_exporter
+```
+
+### Step 16: Configure Prometheus Plugin Integration
+
+As of now we created Prometheus service, but we need to add a job in order to fetch the details by node exporter. So for that we need to create 2 jobs, one with 'node exporter' and the other with 'jenkins' as shown below;
+
+Integrate Jenkins with Prometheus to monitor the CI/CD pipeline.
+
+Prometheus Configuration:
+
+To configure Prometheus to scrape metrics from Node Exporter and Jenkins, you need to modify the prometheus.yml file. 
+```bash
+The path of prometheus.yml is; cd /etc/prometheus/ ----> ls -l ----> You can see the "prometheus.yml" file ----> sudo vi prometheus.yml ----> You will see the content and also there is a default job called "Prometheus" Paste the below content at the end of the file;
+
+  - job_name: 'node_exporter'
+    static_configs:
+      - targets: ['<MonitoringVMip>:9100']
+
+  - job_name: 'jenkins'
+    metrics_path: '/prometheus'
+    static_configs:
+      - targets: ['<your-jenkins-ip>:<your-jenkins-port>']
+```
+
+Check the validity of the configuration file:
+```bash
+promtool check config /etc/prometheus/prometheus.yml
+```
+
+You should see "SUCCESS" when you run the above command, it means every configuration made so far is good.
+
+Reload the Prometheus configuration without restarting:
+
+```bash
+curl -X POST http://localhost:9090/-/reload
+```
+
+Access Prometheus in browser (if already opened, just reload the page):
+```bash
+http://<your-prometheus-ip>:9090/targets
+```
+
+Open Port number 9100 for Monitoring VM 
+
+You should now see "Jenkins (1/1 up)" "node exporter (1/1 up)" and "prometheus (1/1 up)" in the prometheus browser.
+Click on "showmore" next to "jenkins." You will see a link. Open the link in new tab, to see the metrics that are getting scraped
+
+### Step 17: Install Grafana
+
+currently in /etc/Prometheus path.
+
+Install Grafana on Monitoring Server;
+
+#### Step 1: Install Dependencies:
+First, ensure that all necessary dependencies are installed:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y apt-transport-https software-properties-common
+```
+
+####Step 2: Add the GPG Key:
+cd ---> You are now in ~ path
+Add the GPG key for Grafana:
+```bash
+wget -q -O - https://packages.grafana.com/gpg.key | sudo apt-key add -
+```
+You should see OK when executed the above command.
+
+####Step 3: Add Grafana Repository:
+Add the repository for Grafana stable releases:
+```bash
+echo "deb https://packages.grafana.com/oss/deb stable main" | sudo tee -a /etc/apt/sources.list.d/grafana.list
+```
+#### Step 4: Update and Install Grafana:
+Update the package list and install Grafana:
+```bash
+sudo apt-get update
+sudo apt-get -y install grafana
+```
+#### Step 5: Enable and Start Grafana Service:
+
+To automatically start Grafana after a reboot, enable the service:
+```bash
+sudo systemctl enable grafana-server
+```
+
+Start Grafana:
+```bash
+sudo systemctl start grafana-server
+```
+
+#### Step 6: Check Grafana Status:
+Verify the status of the Grafana service to ensure it's running correctly:
+```bash
+sudo systemctl status grafana-server
+```
+
+You should see "Active (running)" in green colour
+Press control+c to come out
+
+#### Step 7: Access Grafana Web Interface:
+The default port for Grafana is 3000
+```bash
+http://<monitoring-server-ip>:3000
+```
+Default id and password is "admin"
+
+The first thing that we have to do in Grafana is to add the data source
+Lets add the data source;
+
+You can either click on "connections" in the left pane or click on "data sources" in the window to add the data source.
+
+```bash
+Click on "Data sources" ----> Select "Prometheus" ----> Enable "default" toggle bar ----> Connection: Paste the Prometheus url ----> Remove / at the end of url ----> Scroll down and click on "Save and test" ----> If everything is fine, you will see "green" colour tick mark.
+```
+
+```bash
+Click on "Dashboards" (left pane) ----> Here we have to add the Grafana dashboard, but as we dont know, we have to get the template of Grafana dashboard. To get the template ----> Goto browser and search for "Grafana node exporter dashboard" (URL: https://grafana.com/grafana/dashboards/1860-node-exporter-full/) ----> In the left pane, click on "Copy to clipboard" ----> Goto grafana ----> In the top right side, click on + ----> Import dashboard ----> Paste the id copied ----> Click on "Load" ----> Scroll down to see "Prometheus" ----> Click on the dropdown ----> Select "Prometheus" ----> Click on "Import" ----> You can now see the dashboard ----> Click on "Save" icon in the top bar right side ----> Click on Save
+```
+
+
+Lets add another dashboard for Jenkins;
+
+```bash
+Goto browser and search for "Grafana jenkins dashboard" (URL: https://grafana.com/grafana/dashboards/9964-jenkins-performance-and-health-overview/) ----> In the left pane, click on "Copy to clipboard" ----> Goto grafana ----> In the top right side, click on + ----> Import dashboard ----> Paste the id copied ----> Click on "Load" ----> Scroll down to see "Prometheus" ----> Click on the dropdown ----> Select "Prometheus" ----> Click on "Import" ----> You can now see the Jenkins dashboard ----> Click on "Save" icon in the top bar right side ----> Click on Save
+```
+
+Click on Dashboards in the left pane, you can see both the dashboards you have just added.
+
+## Using Kubernetes
+
+### Prerequisites
+
+kubectl – A command line tool for working with Kubernetes clusters. For more information, see [Installing or updating kubectl]("https://docs.aws.amazon.com/eks/latest/userguide/install-kubectl.html").
+
+eksctl – A command line tool for working with EKS clusters that automates many individual tasks. For more information, see [Installing or updating]("https://docs.aws.amazon.com/eks/latest/userguide/eksctl.html").
+
+AWS CLI – A command line tool for working with AWS services, including Amazon EKS. For more information, see [Installing, updating, and uninstalling the AWS CLI]("https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-install.html") in the AWS Command Line Interface User Guide. After installing the AWS CLI, we recommend that you also configure it. For more information, see [Quick configuration]("https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-quickstart.html#cli-configure-quickstart-config") with aws configure in the AWS Command Line Interface User Guide.
+
+We need to run the same application on K8S cluster. In order to do that we need to create a K8S cluster.
+
+Open ubuntu terminal and run the following commands;
+
+1. Install eksctl
+2. Install kubectl
+3. Install aws cli
+
+run the following commands;
+```bash
+aws configure
+```
+and provide the Access key ID, Secret access key, region, and output format.
+
+### Step 1: Create Cluster. I will keep the cluster name as "kastrocluster"
+```bash
+eksctl create cluster --name=kastrocluster --region=ap-northeast-1 --zones=ap-northeast-1a,ap-northeast-1c --without-nodegroup  
+```
+**Get List of clusters**
+```bash
+eksctl get cluster
+```
+### Step 02: Create & Associate IAM OIDC Provider for our EKS Cluster
+To enable and use AWS IAM roles for Kubernetes service accounts on our EKS cluster, we must create & associate OIDC identity provider.
+
+To do so using eksctl we can use the below commands.
+
+```bash
+eksctl utils associate-iam-oidc-provider --region ap-northeast-1 --cluster kastrocluster --approve
+```
+### Step 03: Create Node Group with additional Add-Ons in Public Subnets
+These add-ons will create the respective IAM policies for us automatically within our Node Group role.
+
+```bash
+eksctl create nodegroup --cluster=kastrocluster --region=ap-northeast-1 --name=kastrodemo-ng-public1 --node-type=t3.medium --nodes=2 --nodes-min=2 --nodes-max=4 --node-volume-size=20 --ssh-access --ssh-public-key=Prajwal --managed --asg-access --external-dns-access --full-ecr-access --appmesh-access --alb-ingress-access
+```
+```bash
+kubectl get nodes
+```
+
+### Step 04: Verify the Cluster & Nodes
+
+Goto EKS Service in AWS and check for the cluster creation
+
+To deploy the same application in the EKS cluster, we will use ArgoCD.
+
+### Step 05: Install ArgoCD
+
+Inorder to monitor k8s with Prometheus, we need to install ArgoCD. ArgoCD is a declarative, GitOps continuous delivery tool for Kubernetes. It provides a UI and API to sync k8s resources with a Git repository. 
+
+```bash
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.4.7/manifests/install.yaml
+```
+By default the argo CD server is not publicly exposed, so we need to expose it publicly. To do that, execute the below command;
+```bash
+kubectl patch svc argocd-server -n argocd -p '{"spec": {"type": "LoadBalancer"}}'
+```
+
+After successful execution you should see "patched"
+
+```bash
+kubectl get ns
+kubectl get pods -n argocd # to check the pods in the argocd namespace
+```
+By using the load balancer url, we can access the ArgoCD UI.
+
+### Step 06: Monitor Kubernetes with Prometheus
+
+Used to monitor Kubernetes cluster.
+
+Additionally, you'll install the node exporter using Helm to collect metrics from your cluster nodes.
+
+Install Node Exporter using Helm
+
+To begin monitoring your Kubernetes cluster, you'll install the Prometheus Node Exporter. This component allows you to collect system-level metrics from your cluster nodes. Here are the steps to install the Node Exporter using Helm:
+
+Add the Prometheus Community Helm repository:
+
+```bash
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+```
+Create a Kubernetes namespace for the Node Exporter:
+```bash
+kubectl create namespace prometheus-node-exporter
+```
+
+Install the Node Exporter using Helm:
+
+```bash
+helm install prometheus-node-exporter prometheus-community/prometheus-node-exporter --namespace prometheus-node-exporter
+```
+Lets continue with load balancer thing of previous step; execute the below in VS code editor
+```bash
+export ARGOCD_SERVER=`kubectl get svc argocd-server -n argocd -o json | jq --raw-output '.status.loadBalancer.ingress[0].hostname'`
+```
+
+To get the loadbalancer url;
+
+```bash
+echo $ARGOCD_SERVER
+```
+
+Execute the below command in powershell, if the command doesn't get executed in VS Code Editor
+
+```bash
+echo $env:ARGOCD_SERVER
+```
+You will see the load balancer url, copy it and paste in browser. You will see the ArgoCD Homepage.
+
+Username is "admin"
+
+To get the password, execute the below command in vs code editor;
+```bash
+export ARGO_PWD=`kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d`
+```
+
+To see the password;
+```bash
+echo $ARGO_PWD
+```
+
+You will see the password. copy and paste it in the argo cd homepage --->login
+
+In the Argo CD homepage, in the left pane, click on
+"Manage your repos, projects, settings" icon
+----> Click on "Repositories"
+----> Click on "Connect repo using HTTPS"
+```bash
+Type: git
+Project: default
+Repo URL: <GitHub_URL_Of_ZomatoProject>
+```
+----> Click on "Connect" (Top bar, left side)
+----> You can see "connection status" as "successful"
+
+In the Argo CD homepage, in the left pane, click on
+"Manage your apps, and diagnose health problems"
+----> Click on "New App"
+
+```bash
+App Name: Zomato
+Project Name: default
+Sync Policy: Automatic
+Repo URL: <GitHub URL of Zomato Project>
+Revision: HEAD
+Path: <Give the name of Kubernetes folder in Zomato Project Repo>
+Cluster URL: <Select the one from drop down>
+Namespace: default
+```
+
+----> Create
+----> Wait till you see the status to complete
+(it will take 5–10 minutes)
+
+Note:
+```bash
+In the repo, in Kubernetes folder, in the deployment.yml file,
+in the containers section change the DockerHub username.
+```
+
+Add a Job to Scrape Metrics on nodeip:9001/metrics in prometheus.yml:
+
+Update your Prometheus configuration (prometheus.yml) to add a new job for scraping metrics from nodeip:9001/metrics. You can do this by adding the following configuration to your prometheus.yml file:
+
+Go to the monitoring server tab in Moba and execute the below commands;
+
+```bash
+sudo vi /etc/prometheus/prometheus.yml
+```
+```bash
+  - job_name: 'k8s'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['nodeIP:9100']
+```
+In the above, to get the "nodeIP", goto EKS in AWS ----> Click on EKS Cluster ----> "Compute" tab ----> Nodes ----> Click on any one node ----> Click on the "instance id" ----> Copy the public ip ----> Paste in the above script
+
+The static_configs section specifies the targets to scrape metrics from, and in this case, it's set to nodeip:9001.
+
+----> esc ----> :wq ----> promtool check config /etc/prometheus/prometheus.yml ----> You should see "Success" ----> Check the validity of the configuration file ----> promtool check config /etc/prometheus/prometheus.yml ----> curl -X POST http://localhost:9090/-/reload
+
+Goto Prometheus and reload. Goto ArgoCD and reload to see whether the pipeline is done or not
+
+Copy the public ip of "nodeIP" which we have done exactly 4 steps above this line ---> Goto browser and paste it:30001 ----> Make sure to open the port 30001 for the "nodeIP:" VM ----> You will see the application
+
+Note: If you see error in Prometheus under "k8s", open port number 9100 for the EC2 instances which were created as part of EKS cluster i.e nodes
+
+After everything is done. Delete everything. Make sure to delete the Cloud Formation Stacks.
+
+### Step 07: Delete the Cluster
+
+```bash
+eksctl delete cluster <clusterName>
+```

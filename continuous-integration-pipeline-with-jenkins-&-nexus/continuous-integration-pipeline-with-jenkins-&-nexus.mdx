@@ -68,6 +68,10 @@ echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc]" \
   /etc/apt/sources.list.d/jenkins.list > /dev/null
 sudo apt-get update
 sudo apt-get install jenkins -y
+sudo systemctl status jenkins
+sudo systemctl start jenkins
+sudo systemctl enable jenkins
+sudo systemctl status jenkins
 ```
 ### Step-2. Install Maven , Git, Docker and using docker install Nexus Repository.
 
@@ -180,6 +184,9 @@ Configure the following tools:
 ```bash
 go to Nexus UI -> Browse -> maven-releases & maven-snapshots -> copy the url and paste it in the pom.xml file.
 ```
+```bash
+https://github.com/pray-12/Nexus-Demo/blob/main/pom.xml
+```
 
 ### Step-7. Adding Credentials of Nexus to Jenkins[Settings.xml file].
 
@@ -216,7 +223,7 @@ pipeline {
     stages {
         stage('Git Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/KastroVKiran/Nexus-Demo.git'
+                git branch: 'main', url: 'https://github.com/pray-12/Nexus-Demo.git'
             }
         }
         stage('Compile') {
