@@ -1,0 +1,36 @@
+
+https://github.com/pray-12/Boardgame.git
+
+## Project Pipeline Overview
+
+### Phase 1: Repository Setup
+- Initialize the GitHub repository
+
+### Phase 2: Infrastructure Provisioning
+- Set up Kubernetes cluster
+- Configure self-hosted GitHub Actions runner (on VM)
+- Deploy SonarQube for code quality analysis
+- Set up monitoring stack (Prometheus, Grafana, Alertmanager)
+
+### Phase 3: Continuous Integration / Continuous Deployment (CI/CD)
+- Implement CI/CD workflows using GitHub Actions
+
+### Phase 4: Monitoring
+- Implement system-level monitoring
+- Implement website/application-level monitoring
+
+## List of Ports to be Allowed in Security Group
+
+Below are the ports you need to allow in your EC2 Security Group to enable access for all required services:
+
+| Type         | Protocol | Port range      | Source    | Purpose                        |
+|--------------|----------|----------------|-----------|--------------------------------|
+| SSH          | TCP      | 22             | 0.0.0.0/0 | SSH Access                     |
+| HTTP         | TCP      | 80             | 0.0.0.0/0 | Web traffic (HTTP)             |
+| HTTPS        | TCP      | 443            | 0.0.0.0/0 | Web traffic (HTTPS)            |
+| SMTP         | TCP      | 25             | 0.0.0.0/0 | Email (SMTP)                   |
+| SMTPS        | TCP      | 465            | 0.0.0.0/0 | Secure Email (SMTPS)           |
+| Custom TCP   | TCP      | 3000-10000     | 0.0.0.0/0 | Application, Monitoring, etc.  |
+| kubernetes   | TCP      | 6443           | 0.0.0.0/0 | Kubernetes API Server          |
+| mongodb      | TCP      | 27017          | 0.0.0.0/0 | MongoDB                        |
+| Custom TCP   | TCP      | 30000-32767    | 0.0.0.0/0 | Kubernetes NodePort Services   |

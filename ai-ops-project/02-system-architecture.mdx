@@ -1,0 +1,197 @@
+![](/ai-ops-project/images/workflow-0.png)
+
+## Workflow-0
+
+**The Client Layer:** The user interacts with a browser (`User (Browser)`), which loads the frontend built with **React** running on port `:3000`.
+
+**The Proxy/Routing Layer:** Instead of hitting services directly, requests flow through an Nginx Reverse Proxy.
+
+**The API Gateway:** The reverse proxy sends requests to the API Gateway (port `:3001`). The gateway intercepts incoming API routes (like `/api/auth`, `/api/products`, `/api/orders`) and acts as a traffic cop, routing them to the appropriate microservice.
+
+**The Microservices Layer:** The backend is broken down into 5 decoupled, single-responsibility services:
+
+- Auth Service (`:3002`): Handles authentication.
+- Product Service (`:3003`): Handles product catalog management.
+- Orders Service (`:3004`): Handles direct customer order creation.
+- Order Mgmt. Service (`:3005`): Likely handles post-order fulfillment, processing, or admin workflows.
+- User Service (`:3006`): Manages user profiles and account data.
+
+**The Database Layer:** A centralized (or logically partitioned) PostgreSQL instance running on port `:5432` houses separate databases for isolation (`auth_db`, `products_db`, `orders_db`, `users_db`).
+
+**The Observability Stack:** In the bottom left, Prometheus (`:9090`) scrapes metrics from the system, which are then visualized using Grafana dashboards (`:3007`) for real-time monitoring.
+
+# System Architecture Overview: Workflow 0
+
+This document outlines the microservices-based e-commerce system architecture, detailing the end-to-end data flow, service responsibilities, and observability stack.
+
+---
+
+## 1. Client & Routing Layer
+
+The entry point of the application handles user interaction and traffic routing:
+
+* **React Frontend (`:3000`)**: The user-facing web application loaded inside the browser.
+* **Nginx Reverse Proxy**: Sits in front of our backend infrastructure to handle incoming requests, manage SSL termination, and securely forward traffic.
+* **API Gateway (`:3001`)**: Acts as a single entry point for all backend services. It intercepts client paths (e.g., `/api/auth`, `/api/products`, `/api/orders`) and dynamically routes them to their respective microservices.
+
+---
+
+## 2. Microservices Layer
+
+The core business logic is split into five decoupled microservices to ensure high scalability and domain isolation:
+
+| Service | Port | Description |
+| :--- | :--- | :--- |
+| **Auth Service** | `:3002` | Handles user authentication, session tokens, and security. |
+| **Product Service** | `:3003` | Manages the product catalog, inventory details, and search items. |
+| **Orders Service** | `:3004` | Responsible for initial order placement and checkout logic. |
+| **Order Mgmt. Service** | `:3005` | Handles post-purchase order processing, fulfillment state, and tracking. |
+| **User Service** | `:3006` | Manages user profiles, delivery addresses, and account metadata. |
+
+---
+
+## 3. Data Persistence
+
+* **PostgreSQL (`:5432`)**: Utilized as our primary relational database management system.
+* **Database Isolation**: To maintain microservice autonomy and prevent tight coupling, each service interacts with its own dedicated logical database schema:
+  * `auth_db`
+  * `products_db`
+  * `orders_db`
+  * `users_db`
+
+---
+
+## 4. Observability & Monitoring
+
+To keep track of system health, performance, and bottlenecks, we implement a standard Prometheus-Grafana stack:
+
+* **Prometheus (`:9090`)**: Periodically scrapes time-series metrics from the API Gateway and backend microservices.
+* **Grafana (`:3007`)**: Consumes metrics from Prometheus to provide rich, visual monitoring dashboards for real-time debugging and alerting.
+
+
+  **Interview Note:** If asked about scaling, emphasize that because each domain (like Products or Orders) is containerized as its own microservice on separate ports, we can scale them independently based on traffic spikes (e.g., scaling up the Product Service during a holiday sale without touching the Auth Service).
+
+## Workflow-1 Localdev. using Docker Compose
+
+![](/ai-ops-project/images/workflow-1.png)
+
+**The Orchestrator:** Instead of manually launching 5 microservices, a frontend, an API gateway, a database, and two monitoring tools one-by-one, the developer runs a single command: docker-compose up --build.
+
+- **The --build flag:** ensures Docker compiles the latest local code changes into fresh container images before starting them.
+
+- **The Shared Network:** Docker Compose creates an isolated, virtual Shared Docker Internal Network. This is crucial: it allows all these separate containers to talk to each other using their service names as hostnames (e.g., the API Gateway can route traffic to http://auth-service:3002 internally without exposing everything to the host machine's public ports).
+
+- **The Services:** * Frontend (:3000): Now shown integrated with Nginx directly, serving the compiled static assets.
+
+   - **API Gateway (:3001) & Services (:3002 - :3006):** All backend microservices spin up inside the same network.
+
+   - **Prometheus (:9090) & Grafana (:3007):** The monitoring stack boots right alongside the apps, allowing local performance and metric tracking during development.
+
+   - **Data Persistence (PostgreSQL :5432):** Instead of installing Postgres locally on the laptop, Docker pulls a standard, public image. During the startup sequence, initialization scripts create the 4 isolated logical databases (auth_db, etc.) automatically.
+
+![](/ai-ops-project/images/workflow-2.png)
+
+## Workflow 2: Cloud Infrastructure with Terraform
+
+This diagram shows how the system moves away from a local machine (Workflow 1) and scales up into a professional cloud environment (Amazon Web Services - AWS).
+
+Instead of configuring the cloud manually by clicking buttons in the AWS Console, the team treats infrastructure exactly like software code using an Infrastructure as Code (IaC) tool called Terraform. Running a single command, `terraform apply`, instructs AWS to build the entire network, compute power, and security barriers automatically.
+
+### Key Pillars of the Infrastructure
+
+The blueprint is broken into three modular responsibilities, followed by an automation layer:
+
+#### 1. The Network Perimeter (Networking Module $\rightarrow$ AWS VPC)
+Before building servers, a secure, isolated sandbox must be carved out in the cloud.
+
+- **AWS VPC:** A Virtual Private Cloud is built using a custom IP address range (10.1.0.0/16).
+
+- **High Availability:** It is spread across 3 Availability Zones (AZs). This means the infrastructure lives in three distinct, physical data centers. If one data center suffers a power outage, the application stays online in the other two.
+
+- **Traffic Control:** It automatically sets up the public/private subnets, Internet Gateways (IGW), and route tables that dictate how traffic moves in and out.
+
+#### 2. The Compute Engine (EKS Module $\rightarrow$ EKS Cluster)
+
+This replaces Docker Compose. Instead of running on a single laptop, the containers are now orchestrated by Amazon EKS (Elastic Kubernetes Service).
+
+- **Spot Nodes:** To save money, the cluster utilizes "Spot Nodes" (AWS's spare capacity sold at a steep discount), which is ideal for stateless microservices.
+
+- **Storage Management:** The EBS CSI Driver is installed so that databases can request and connect to physical cloud hard drives (Amazon EBS) automatically.
+
+- **Security (IAM & OIDC):** This integrates AWS security roles with Kubernetes, making sure services only have permission to access the specific resources they need to do their jobs.
+
+#### 3. The Image Registry (ECR Module $\rightarrow$ ECR Repositories)
+The code built by developers needs a secure place to live in the cloud before running.
+
+- **7 Private Registries:** Terraform provisions 7 private Amazon ECR repositories—one for each of the 5 microservices, 1 for the frontend, and 1 for the API gateway. This keeps container artifacts isolated and secure.
+
+#### 4. The Bootstrapping Layer (Helm Installs)
+Once the cloud hardware is live, Terraform uses a tool called Helm (the package manager for Kubernetes) to immediately install critical foundation software inside the cluster:
+
+- **ArgoCD:** A GitOps tool that watches a Git repository and automatically deploys or updates the microservices whenever code is pushed.
+
+- **kube-prometheus-stack:** Installs the cloud versions of Prometheus and Grafana right out of the box so that cluster performance tracking begins immediately.
+
+## Workflow 3: CI/CD Pipeline with github actions
+
+![](/ai-ops-project/images/workflow-3.png)
+
+This diagram illustrates how the code written by engineers transitions from a local machine into production-ready container images. It represents the Continuous Integration (CI) phase of the pipeline using GitHub Actions.
+
+Instead of manually building and pushing Docker images for seven individual services, the process is fully automated on every code update.
+
+### Key Pillars of the CI Pipeline
+
+#### 1. The Trigger
+
+- **git push -> project-demo branch:** The pipeline starts automatically the moment a developer pushes new code or merges a pull request into the targeted branch (in this case, project-demo).
+
+- **ci.yml triggered:** GitHub detects this push and kicks off the workflow defined in the ci.yml configuration file.
+
+#### 2. Efficiency via Matrix Builds
+
+- **Matrix Build (7 Services in parallel):** A major bottleneck in microservices architectures is waiting for multiple services to build sequentially. To solve this, the pipeline utilizes a GitHub Actions Matrix.
+
+- **This spins up 7 separate, isolated runner environments simultaneously. All 7 components (Auth, Product, Orders, Order Mgmt, User, Frontend, and API Gateway) are built at the exact same time, drastically cutting down build times.**
+
+#### 3. Anatomy of Each Job
+For every service running in the matrix, a standardized, 4-step execution lifecycle takes place:
+
+- **auth ECR:** Authenticates the GitHub runner safely with Amazon Web Services (AWS) using secure credentials.
+
+- **build image:** Compiles the latest application code using the service's specific Dockerfile.
+
+- **tag w/ commit SHA:** This is a crucial best practice. Instead of tagging images with a generic and mutable latest tag, each image is explicitly stamped with its unique Git Commit SHA (e.g., v1.0.0-8a3f91b). This creates a clear audit trail connecting the running container directly back to the exact code change that generated it.
+
+- **push:** Uploads the newly minted container image securely into its respective private Amazon ECR repository created by Terraform in Workflow 2.
+
+## Workflow 4: Observability & Monitoring with Prometheus and Grafana
+
+![](/ai-ops-project/images/workflow-4.png)
+
+This diagram illustrates how the running system is monitored in production. In a microservices architecture, tracking down bugs or performance bottlenecks can be incredibly difficult because the system is split across dozens of isolated application instances. This workflow shows how we capture real-time health data using an automated pull-based metrics collection pipeline inside Kubernetes.
+
+### Key Pillars of the Monitoring Pipeline
+
+#### 1. The Metrics Instrumentation Layer
+
+- **/metrics Endpoints:** Every single microservice (`Auth`, `Product`, `Orders`, etc.) is instrumented to track its own vital signs—such as HTTP request counts, response latency, memory usage, and error rates.
+
+This data is exposed over a standard, secure HTTP path called /metrics (e.g., http://product-service/metrics). The service simply updates these numbers in memory, waiting for them to be collected.
+
+2. The Kubernetes Discovery Layer (ServiceMonitor)
+- **ServiceMonitor:** In a dynamic cloud environment like Kubernetes, containers (pods) are constantly scaling up, down, or restarting, meaning their IP addresses change daily.
+
+- **Instead of hardcoding a list of IPs for Prometheus to monitor, we use a custom Kubernetes resource called a ServiceMonitor (part of the Prometheus Operator stack). The ServiceMonitor watches the cluster's live registry, automatically discovers new microservice pods via labels, and tells Prometheus exactly which dynamic endpoints need to be scraped.**
+
+#### 3. The Scraping and Storage Engine (Prometheus)
+
+- **Pull-Based Collection:** Unlike traditional monitoring tools where applications explicitly send logs to a server, Prometheus uses a pull model. It actively pulls (scrapes) health data from those discovered endpoints regularly (configured here to scrape every 15 seconds).
+
+- **Time-Series Database:** Prometheus stores this data in a highly efficient time-series format, indexing metrics sequentially over time (e.g., tracking how a service's memory usage spikes at 2:00 PM vs 3:00 PM).
+
+#### 4. The Visualization Layer (Grafana Dashboards)
+
+- **Grafana Dashboards:** Prometheus is excellent for collecting data, but its raw text metrics are difficult for human operators to quickly parse.
+
+- **Grafana:** connects directly to Prometheus as its data source, converting raw time-series logs into beautiful, real-time, visual dashboards. This allows engineers to spot memory leaks, analyze sudden spikes in API error rates, and configure automated alert systems (e.g., page an engineer if the `Orders` database fails) at a single glance.

@@ -1,0 +1,1544 @@
+# Distributed Systems
+
+Distributed Systems come under the pillars of **Scalability** and **Fault Tolerance**.
+
+## Why Do We Need Distributed Systems?
+
+For small applications, the architecture is usually simple:
+
+```text
+User Request
+      ↓
+NGINX (Routing/Reverse Proxy)
+      ↓
+Backend Application
+      ↓
+Database
+```
+
+Everything runs on a **single machine**. This setup works well when traffic is low.
+
+However, as traffic increases:
+
+* CPU utilization reaches its limit.
+* Memory gets exhausted.
+* Network bandwidth becomes a bottleneck.
+* A single hardware failure can bring down the entire application.
+
+To overcome these limitations, we move from a **single system** to a **distributed system**, where the application is split across multiple machines that work together.
+
+## Benefits of Distributed Systems
+
+### 1. Horizontal Scaling
+
+Instead of upgrading a single server (Vertical Scaling), we can add more machines to handle increased traffic and workload.
+
+### 2. Fault Tolerance
+
+No single machine becomes critical to the application's availability. If one server fails, other servers continue serving requests, minimizing downtime.
+
+### 3. High Availability
+
+Applications remain accessible even during server failures, maintenance activities, or unexpected outages.
+
+### 4. Better Performance
+
+Workloads can be distributed across multiple servers, reducing bottlenecks and improving response times.
+
+## Interview Answer
+
+A distributed system is an architecture where multiple machines work together as a single system. Small applications can run on one server with NGINX, a backend application, and a database. However, as user traffic grows, CPU, memory, and network resources become bottlenecks, and a single hardware failure can cause downtime. To solve these challenges, organizations distribute workloads across multiple servers. This provides horizontal scalability, fault tolerance, high availability, and improved performance.
+
+
+## How do microservices enable independent scaling and team ownership compared to monolithic architecture?
+
+Microservices enable independent scaling by allowing each service to scale based on its own workload instead of scaling the entire application. For example, if the payment service receives more traffic than the user service, only the payment service can be scaled. They also promote team ownership, where different teams manage specific services independently, leading to faster development, easier deployments, and better maintainability compared to a monolithic architecture.
+
+![](/ai-ops-project/images/architecture.png)
+
+This architecture follows the microservices pattern where an API Gateway acts as the entry point and routes requests to independent services such as Auth, Product, Cart, Order, and Front-End. Each service runs inside Docker containers and is orchestrated by Kubernetes. Every service has its own database and can be deployed and scaled independently. This approach improves scalability, fault tolerance, team ownership, and maintainability compared to a monolithic architecture.
+
+## Inter-Service Communication in Microservices
+
+In a microservices architecture, services communicate either synchronously using REST APIs or gRPC, or asynchronously using message brokers such as Kafka or RabbitMQ for sending emails, generating reports, etc. Synchronous communication is suitable when an immediate response is required, while asynchronous communication is preferred for scalable and fault-tolerant systems. Modern distributed systems often use a combination of both approaches depending on the business requirement.
+
+## Idempotency
+
+Idempotency is the property of an operation where performing the same request multiple times produces the same result as performing it once. It prevents duplicate processing when a client retries a request due to network failures, timeouts, or other issues.
+
+## Example
+
+Consider an online payment scenario:
+
+```text
+Client → Payment Service
+        ↓
+Pay ₹1000
+```
+The payment is successful, but the response is lost due to a network issue. The client retries the same request.
+
+Without idempotency:
+
+```text
+₹1000 may be charged twice.
+```
+
+With idempotency:
+
+The service recognizes the request has already been processed and returns the previous result instead of creating another payment.
+How It Is Implemented
+
+A unique Idempotency Key is sent with each request.
+
+```bash
+Idempotency-Key: abc123
+```
+
+The service stores the key and the response. If the same key is received again, it returns the stored response instead of processing the request again.
+
+Where It Is Used
+
+- Payment processing
+- Order creation
+- Ticket booking systems
+- API retries
+- Distributed systems and microservices
+
+## API Versioning
+
+API Versioning allows us to make changes to an API without breaking existing consumers. For example, /api/v1/users and /api/v2/users can run simultaneously, enabling older clients to continue working while new clients use enhanced functionality. This ensures backward compatibility and smooth API evolution.
+
+# Service Discovery
+
+## Why Does Service Discovery Happen?
+
+In a microservices architecture, services are deployed dynamically and can scale up or down at any time. Their IP addresses may change whenever a container or pod is restarted. Because of this, hardcoding service IPs is not practical.
+
+Service Discovery helps services locate and communicate with each other without needing to know their actual IP addresses.
+
+### Problem Without Service Discovery
+
+```text id="x8w2ka"
+Order Service
+      ↓
+Needs Product Service
+      ↓
+Product Service Pod Restarts
+      ↓
+IP Address Changes
+      ↓
+Communication Fails
+```
+
+The Order Service cannot find the Product Service if it relies on a fixed IP address.
+
+## Types of Service Discovery
+
+### 1. Client-Side Discovery
+
+The client queries a service registry to find available service instances and then directly calls the target service.
+
+```text id="t4g1pf"
+Order Service
+      ↓
+Service Registry
+      ↓
+Product Service
+```
+
+Examples:
+
+* Netflix Eureka
+* Consul
+
+### Advantages
+
+* Better load balancing control
+* Reduced load on intermediary components
+
+### Disadvantages
+
+* Client must contain discovery logic
+
+### 2. Server-Side Discovery
+
+The client sends the request to a load balancer or gateway, which queries the service registry and routes the request to the appropriate service.
+
+```text id="9v4j8e"
+Order Service
+      ↓
+Load Balancer/API Gateway
+      ↓
+Product Service
+```
+
+Examples:
+
+* Kubernetes Service
+* AWS Elastic Load Balancer
+
+### Advantages
+
+* Simpler client implementation
+* Centralized routing
+
+### Disadvantages
+
+* Additional infrastructure component
+
+## Common Solutions
+
+### Kubernetes Service Discovery
+
+In Kubernetes, every service gets a DNS name.
+
+Example:
+
+```text id="e6m1rq"
+http://product-service
+http://auth-service
+http://order-service
+```
+
+Instead of calling an IP address, services communicate using service names. Kubernetes automatically updates routing when pods are created, deleted, or restarted.
+
+### Other Service Discovery Tools
+
+* Eureka (Netflix)
+* Consul (HashiCorp)
+* ZooKeeper
+* etcd
+* Kubernetes DNS/CoreDNS
+
+## Interview Answer
+
+Service Discovery is a mechanism that enables microservices to locate and communicate with each other dynamically. It is required because service instances are frequently created, destroyed, or restarted, causing their IP addresses to change. Service discovery eliminates the need for hardcoded IP addresses by using a service registry or DNS-based mechanism. The two main types are Client-Side Discovery, where the client queries the registry directly, and Server-Side Discovery, where a load balancer or gateway handles service lookup and routing. In Kubernetes, service discovery is commonly achieved using Services and CoreDNS.
+
+## Load balancing
+
+### Layer 4 vs Layer 7 Load Balancer
+
+A Load Balancer distributes incoming traffic across multiple servers to improve performance, scalability, and availability. Load balancers can operate at different layers of the OSI model, with Layer 4 and Layer 7 being the most common.
+
+### Layer 4 Load Balancer (Transport Layer)
+
+Layer 4 load balancers operate at the Transport Layer and make routing decisions based on network information such as:
+
+- Source IP Address
+- Destination IP Address
+- Port Number
+- TCP/UDP Protocol
+
+They do not inspect the actual content of the request.
+
+**keypoints:**
+
+- Very faster
+- low overhead
+- Routed based on IP and port
+- Doesn't understand HTTP
+
+### Layer 7 Load Balancer (Application Layer)
+
+Layer 7 load balancers operate at the Application Layer and make routing decisions based on the actual content of the request such as:
+
+- HTTP Headers
+- URL Path
+- Query Parameters
+- Body Content
+
+They inspect the actual content of the request.
+
+**keypoints:**
+
+- Slower than Layer 4
+- Understand HTTP, headers, urls, cookies
+- can route based on the request, path, content type, or even host header.
+
+### Load balancing algorithms
+
+## 1. Round Robin
+
+Requests are distributed sequentially across all available servers. Each server receives an equal number of requests in rotation.
+
+### Use Case
+
+Works well when all servers have similar hardware configurations and workloads.
+
+## 2. Least Connections
+
+New requests are sent to the server with the fewest active connections.
+
+### Use Case
+
+Useful when request processing times vary and some servers may be handling longer-running requests.
+
+## 3. IP Hashing
+
+The load balancer hashes the client's IP address and routes requests from the same client to the same server.
+
+### Use Case
+
+Useful for sticky sessions where user session data is stored locally on a server.
+
+## 4. Weighted Round Robin
+
+Servers are assigned different weights based on their capacity. Servers with higher weights receive more requests.
+
+### Example
+
+```text
+Server A = Weight 5
+Server B = Weight 3
+Server C = Weight 2
+```
+
+Server A receives more traffic because it has greater processing power.
+
+### Use Case
+
+Ideal when servers have different CPU, memory, or hardware capacities.
+
+# Kubernetes Service Types
+
+## 5. ClusterIP
+
+ClusterIP is the default Kubernetes Service type. It exposes an application only within the Kubernetes cluster.
+
+### Use Case
+
+Used for internal communication between microservices.
+
+```text
+Order Service → Product Service
+```
+
+## 6. NodePort
+
+NodePort exposes a service on a specific port of every Kubernetes node.
+
+### Example
+
+```text
+NodeIP:30080
+```
+
+External users can access the application using the node's IP address and port.
+
+### Use Case
+
+Testing and development environments.
+
+## 7. LoadBalancer
+
+LoadBalancer creates an external cloud load balancer and exposes the service to the internet.
+
+### Use Case
+
+Production workloads running on cloud providers such as AWS, Azure, or GCP.
+
+```text
+Internet
+    ↓
+Cloud Load Balancer
+    ↓
+Kubernetes Service
+```
+
+## 8. Ingress
+
+Ingress is a Layer 7 HTTP/HTTPS router that provides path-based and host-based routing.
+
+### Example
+
+```text
+/api/products → Product Service
+/api/orders   → Order Service
+```
+
+### Benefits
+
+* Single entry point
+* SSL termination
+* Path-based routing
+* Host-based routing
+
+## 9. Gateway
+
+A Gateway is an advanced traffic management component used in modern Kubernetes environments, especially with Service Mesh technologies such as Istio.
+
+### Capabilities
+
+* Traffic routing
+* Authentication
+* Authorization
+* Rate limiting
+* Traffic splitting
+* Canary deployments
+
+### Example
+
+```text
+Users
+   ↓
+Gateway
+   ↓
+Microservices
+```
+
+### Use Case
+
+Large-scale microservices architectures requiring advanced traffic management and security policies.
+
+# Interview Answer
+
+Load balancing algorithms determine how requests are distributed across servers. Common algorithms include Round Robin, Least Connections, IP Hashing, and Weighted Round Robin. In Kubernetes, services are exposed using ClusterIP, NodePort, LoadBalancer, and Ingress. For advanced traffic management in microservices architectures, Gateways are used to provide routing, security, and observability features.
+
+### High availability
+
+## What Happens When a Server Crashes?
+
+If an application runs on a single server and that server crashes, the application becomes unavailable, resulting in downtime for users.
+
+High Availability (HA) is the practice of designing systems so that failures do not cause service interruptions. The system should continue serving requests even when individual servers, services, or infrastructure components fail.
+
+## Key Principles of High Availability
+
+### 1. Redundancy
+
+Multiple instances of servers, applications, or databases are maintained so that if one fails, another can take over.
+
+```text
+Load Balancer
+      ↓
+Server 1
+Server 2
+Server 3
+```
+
+If Server 1 crashes, traffic is automatically routed to Server 2 or Server 3.
+
+### 2. Multi-AZ Deployment
+
+Applications are deployed across multiple Availability Zones (AZs).
+
+```text
+AZ-1                AZ-2
+Server 1            Server 2
+Database Replica    Database Replica
+```
+
+If an entire Availability Zone goes down, the application remains available from another zone.
+
+### 3. Health Checks
+
+Load balancers continuously monitor application instances using health checks.
+
+If a server becomes unhealthy, it is automatically removed from traffic routing.
+
+```text
+Health Check Failed
+        ↓
+Remove Server from Load Balancer
+        ↓
+Route Traffic to Healthy Servers
+```
+
+### 4. Stateless Services
+
+Application instances should be stateless, meaning they do not store user session data locally.
+
+Any instance should be able to handle any request.
+
+### Benefits
+
+* Easier scaling
+* Faster failover
+* Better fault tolerance
+
+# RTO and RPO
+
+## RTO (Recovery Time Objective)
+
+RTO defines how quickly a system must be restored after a failure.
+
+### Question It Answers
+
+> How long can the system remain unavailable before it causes unacceptable business impact?
+
+### Example
+
+```text
+RTO = 30 minutes
+```
+
+The application must be restored within 30 minutes of an outage.
+
+## RPO (Recovery Point Objective)
+
+RPO defines the maximum amount of data loss that the business can tolerate.
+
+### Question It Answers
+
+> How much data loss is acceptable after a failure?
+
+### Example
+
+```text
+RPO = 5 minutes
+```
+
+The business can tolerate losing at most 5 minutes of data.
+
+# Interview Answer
+
+High Availability is the practice of designing systems to remain operational even when failures occur. It is achieved through redundancy, Multi-AZ deployments, health checks, and stateless services. If one server fails, traffic is automatically routed to healthy instances, minimizing downtime. Two important HA metrics are RTO (Recovery Time Objective), which defines how quickly a system must recover, and RPO (Recovery Point Objective), which defines the maximum acceptable data loss during a failure.
+
+
+### Auto Scaling in Kubernetes
+
+Auto Scaling automatically adjusts application resources based on workload and traffic patterns. This helps maintain performance while optimizing infrastructure costs.
+
+
+## 1. HPA (Horizontal Pod Autoscaler)
+
+HPA scales the number of pods based on resource utilization metrics such as CPU and memory.
+
+### How It Works
+
+* Monitors CPU and memory usage across pods.
+* When average CPU utilization exceeds a configured threshold, it creates additional pods.
+* When traffic decreases, it removes unnecessary pods.
+
+### Example
+
+```text id="8b9nq2"
+Traffic Increases
+        ↓
+CPU Usage > 80%
+        ↓
+HPA Adds More Pods
+```
+
+### Benefits
+
+* Improves application availability.
+* Handles sudden traffic spikes automatically.
+* Reduces manual intervention.
+
+## 2. VPA (Vertical Pod Autoscaler)
+
+VPA adjusts the CPU and memory resources assigned to existing pods.
+
+### How It Works
+
+* Monitors resource consumption.
+* Recommends or automatically updates CPU and memory requests/limits.
+* Ensures pods have sufficient resources.
+
+### Limitation
+
+To apply new resource configurations, pods usually need to be restarted, which may cause temporary disruptions if not configured properly.
+
+### Example
+
+```text id="kq6r7x"
+Pod Memory = 512MB
+        ↓
+Usage Increases
+        ↓
+VPA Updates to 1GB
+```
+
+## 3. Cluster Autoscaler
+
+Cluster Autoscaler scales the number of worker nodes in the Kubernetes cluster.
+
+### How It Works
+
+* Adds nodes when pods cannot be scheduled due to insufficient resources.
+* Removes underutilized nodes when demand decreases.
+
+### Example
+
+```text id="x1m5pd"
+More Pods Needed
+        ↓
+No Node Capacity Available
+        ↓
+Cluster Autoscaler Adds New Node
+```
+
+### Benefits
+
+* Ensures enough infrastructure for workloads.
+* Optimizes cloud costs.
+
+## 4. KEDA (Kubernetes Event-Driven Autoscaler)
+
+KEDA scales applications based on external events instead of only CPU or memory metrics.
+
+### Examples of Events
+
+* Kafka messages
+* RabbitMQ queue length
+* AWS SQS messages
+* Database events
+* Prometheus metrics
+
+### Key Advantages
+
+* More intelligent than CPU-based scaling.
+* Ideal for event-driven architectures.
+* Can scale pods from zero to many instances when events occur.
+
+### Example
+
+```text id="a7n2zs"
+1000 Messages in Kafka
+          ↓
+KEDA Detects Queue Growth
+          ↓
+Creates More Pods
+```
+
+## Project Note
+
+In our project, we will use a fixed replica count instead of auto scaling. This keeps the deployment simple and predictable for learning purposes. In real-world production environments, HPA, Cluster Autoscaler, and KEDA are commonly used to handle dynamic workloads efficiently.
+
+# Interview Answer
+
+Kubernetes provides multiple auto-scaling mechanisms. HPA scales the number of pods based on CPU and memory utilization. VPA adjusts CPU and memory resources assigned to existing pods, although it may require pod restarts. Cluster Autoscaler scales the number of worker nodes when cluster resources become insufficient. KEDA extends Kubernetes auto scaling by scaling applications based on external events such as Kafka messages, RabbitMQ queues, or SQS messages, making it ideal for event-driven workloads.
+
+### Reliability with k8s
+
+Reliability ensures that applications remain available and recover automatically from failures. Kubernetes provides several built-in features to improve application reliability and minimize downtime.
+
+## 1. Self-Healing
+
+Self-healing is one of Kubernetes' core capabilities. If a pod or container fails, Kubernetes automatically detects the failure and restores the desired state.
+
+### Example
+
+```text id="4z8h7m"
+Pod Crashes
+     ↓
+Kubernetes Detects Failure
+     ↓
+New Pod Created Automatically
+```
+
+### Benefits
+
+* Reduced downtime
+* Automatic recovery
+* Improved availability
+
+## 2. Liveness Probes
+
+Liveness probes determine whether a container is still running correctly.
+
+If the container stops responding, Kubernetes assumes it is unhealthy and restarts it.
+
+### Actions
+
+```text id="n7k2r1"
+Container Unresponsive
+        ↓
+Liveness Probe Fails
+        ↓
+Kubernetes Kills Container
+        ↓
+New Container Starts
+```
+
+### Use Cases
+
+Detects:
+
+* Deadlocks (application is stuck and cannot proceed)
+* Infinite loops
+* Unrecoverable application states
+* Hung processes
+
+### Interview Point
+
+Liveness probes answer the question:
+
+> "Should Kubernetes restart this container?"
+
+## 3. Readiness Probes
+
+Readiness probes determine whether a container is ready to receive traffic.
+
+If a readiness probe fails, Kubernetes does not restart the container. Instead, it removes the pod from the Service endpoints until it becomes healthy again.
+
+### Example
+
+```text id="q5p9vx"
+Application Starting
+        ↓
+Readiness Probe Fails
+        ↓
+No Traffic Sent
+        ↓
+Application Ready
+        ↓
+Traffic Allowed
+```
+
+### Use Cases
+
+* Application startup time
+* Database connection initialization
+* Cache warm-up
+
+### Interview Point
+
+Readiness probes answer the question:
+
+> "Can this pod receive user requests?"
+
+## 4. Resource Requests and Limits
+
+Resource Requests and Limits help Kubernetes manage CPU and memory efficiently.
+
+### Requests
+
+Defines the minimum CPU and memory required by a pod.
+
+```yaml id="8m4r2k"
+resources:
+  requests:
+    cpu: "500m"
+    memory: "512Mi"
+```
+
+### Limits
+
+Defines the maximum CPU and memory a pod can consume.
+
+```yaml id="x3j8sw"
+resources:
+  limits:
+    cpu: "1"
+    memory: "1Gi"
+```
+
+### Role
+
+* Prevent resource starvation
+* Avoid noisy-neighbor problems
+* Ensure fair resource sharing
+* Improve cluster stability
+
+## 5. Pod Disruption Budget (PDB)
+
+A Pod Disruption Budget protects applications during voluntary disruptions.
+
+### Examples of Voluntary Disruptions
+
+* Node maintenance
+* Cluster upgrades
+* Node draining
+
+### Example
+
+```text id="v2d9ta"
+Application Replicas = 5
+PDB = Minimum 3 Available
+```
+
+Kubernetes ensures that at least 3 pods remain available during maintenance activities.
+
+### Benefits
+
+* Maintains application availability
+* Prevents excessive pod evictions
+
+## 6. ReplicaSets
+
+A ReplicaSet ensures that a specified number of pod replicas are always running.
+
+### Example
+
+```text id="j4n6ep"
+Desired Replicas = 3
+
+Pod 1 ✓
+Pod 2 ✗ (Failed)
+Pod 3 ✓
+
+ReplicaSet Creates New Pod
+```
+
+### Benefits
+
+* Automatic pod replacement
+* High availability
+* Fault tolerance
+
+### Interview Point
+
+A Deployment manages ReplicaSets, and ReplicaSets manage Pods.
+
+# Interview Answer
+
+Kubernetes improves reliability through self-healing mechanisms such as ReplicaSets, Liveness Probes, and Readiness Probes. Liveness probes detect unhealthy containers and automatically restart them, while Readiness probes ensure traffic is sent only to healthy pods. Resource Requests and Limits prevent resource contention and improve cluster stability. Pod Disruption Budgets protect applications during maintenance activities by ensuring a minimum number of pods remain available. Together, these features help Kubernetes maintain application availability and recover automatically from failures.
+
+### Security in Modern Applications and Kubernetes
+
+Security is a critical pillar of system design. It ensures that only authorized users can access resources, sensitive data remains protected, and communication between services is secure.
+
+## 1. Authentication
+
+Authentication answers the question:
+
+> Who is accessing the system?
+
+It verifies the identity of users, applications, or services before granting access.
+
+### Examples
+
+* Username and Password
+* JWT Tokens
+* OAuth 2.0
+* Single Sign-On (SSO)
+
+## 2. Authorization
+
+Authorization answers the question:
+
+> What is the user allowed to do?
+
+Once a user is authenticated, authorization determines the permissions they have.
+
+### Example
+
+```text id="m8v2qa"
+Admin → Create, Update, Delete
+User  → Read Only
+```
+
+## 3. Encryption
+
+Encryption protects sensitive data from unauthorized access.
+
+### Encryption at Rest
+
+Data stored in databases, disks, or backups is encrypted.
+
+### Examples
+
+* Database encryption
+* EBS volume encryption
+* S3 bucket encryption
+
+### Encryption in Transit
+
+Data moving between services is encrypted using TLS/HTTPS.
+
+### Example
+
+```text id="v7r9sx"
+User
+  ↓ HTTPS
+API Gateway
+  ↓ TLS
+Microservices
+```
+
+## 4. Auditing
+
+Auditing records activities and changes occurring within the system.
+
+### Questions It Answers
+
+* Who performed an action?
+* What action was performed?
+* When was it performed?
+
+### Benefits
+
+* Security investigations
+* Compliance requirements
+* Incident analysis
+
+## 5. Network Policies
+
+Network Policies control communication between pods in Kubernetes.
+
+### Example
+
+```text id="x4d6ne"
+Order Service
+      ↓ Allowed
+Product Service
+
+Frontend
+      ↓ Denied
+Database
+```
+
+### Benefits
+
+* Micro-segmentation
+* Reduced attack surface
+* Better security isolation
+
+## 6. JWT (JSON Web Token)
+
+JWT is a token-based authentication mechanism commonly used in modern applications.
+
+### How It Works
+
+```text id="q8p3zw"
+User Login
+      ↓
+Authentication Service
+      ↓
+JWT Token Issued
+      ↓
+Client Stores Token
+      ↓
+Token Sent with Every Request
+```
+
+### Behavior
+
+* Every request carries the token.
+* Server validates the token signature.
+* No database lookup is required for every request.
+
+### Key Properties
+
+* Stateless Authentication
+* Scalable
+* Fast token verification
+
+## 7. Password Security (bcrypt)
+
+Passwords should never be stored in plain text.
+
+bcrypt is a password hashing algorithm that converts passwords into secure hashes before storing them.
+
+### Example
+
+```text id="t5n8yb"
+Password: admin123
+
+Stored Value:
+$2b$12$...
+```
+
+### Benefits
+
+* Protects passwords if the database is compromised.
+* Resistant to brute-force attacks.
+* Industry-standard password hashing mechanism.
+
+## 8. Zero Trust Model
+
+The Zero Trust principle is:
+
+> Never Trust, Always Verify.
+
+Every user, service, and request must be authenticated and authorized regardless of its location.
+
+### Principles
+
+* Verify every request
+* Least privilege access
+* Continuous validation
+
+# Kubernetes Security
+
+## 9. Secrets
+
+Kubernetes Secrets securely store sensitive information.
+
+### Examples
+
+* Database passwords
+* API keys
+* TLS certificates
+* Access tokens
+
+### Benefit
+
+Avoid hardcoding credentials inside application code or configuration files.
+
+## 10. IAM Roles
+
+IAM (Identity and Access Management) provides fine-grained access control.
+
+### Principle
+
+Grant only the minimum permissions required.
+
+### Example
+
+```text id="c2w7pq"
+Application
+      ↓
+Read S3 Bucket Only
+```
+
+This follows the Principle of Least Privilege.
+
+## 11. Network Policies
+
+Kubernetes Network Policies define which pods can communicate with each other.
+
+### Example
+
+```text id="y9r4ku"
+Frontend → Backend ✓
+Backend  → Database ✓
+Frontend → Database ✗
+```
+
+### Benefits
+
+* Service isolation
+* Reduced attack surface
+* Improved security posture
+
+# Project Security Implementation
+
+In our project, we will implement:
+
+* JWT Authentication for secure user authentication.
+* bcrypt for password hashing and secure credential storage.
+* Kubernetes Secrets for managing sensitive configuration values such as database passwords and API keys.
+* Kubernetes Network Policies to control communication between services and improve security.
+
+# Interview Answer
+
+Security in modern applications is achieved through authentication, authorization, encryption, auditing, and network isolation. Authentication verifies user identity, while authorization controls permissions. JWT provides stateless authentication, and bcrypt securely hashes passwords before storage. Kubernetes enhances security through Secrets, IAM Roles, and Network Policies. In our project, we use JWT for authentication, bcrypt for password hashing, Kubernetes Secrets for credential management, and Network Policies to secure communication between services.
+
+
+### Observability
+
+Observability is the ability to understand the internal state of a system by analyzing its outputs. In modern distributed systems, observability helps teams detect, troubleshoot, and resolve issues quickly.
+
+The three pillars of observability are **Logs, Metrics, and Traces**.
+
+## 1. Logs
+
+Logs are time-stamped records of events generated by applications, services, and infrastructure.
+
+### Logs Include
+
+* User requests
+* Application events
+* Errors and exceptions
+* Database queries
+* Authentication activities
+
+### Example
+
+```text id="3x9k7a"
+2025-06-09 10:30:25
+User Login Successful
+UserID: 123
+```
+
+### Purpose
+
+* Debugging issues
+* Investigating failures
+* Security auditing
+
+### Tools
+
+* ELK Stack (Elasticsearch, Logstash, Kibana)
+* EFK Stack
+* Loki
+
+## 2. Metrics
+
+Metrics are numerical measurements collected over time.
+
+They help monitor the health and performance of applications and infrastructure.
+
+### Common Metrics
+
+* Request Rate
+* Error Rate
+* CPU Usage
+* Memory Usage
+* Disk Usage
+* Response Time
+
+### Example
+
+```text id="k7m4pt"
+CPU Usage = 75%
+Memory Usage = 60%
+Requests/sec = 500
+```
+
+### Purpose
+
+* Performance monitoring
+* Capacity planning
+* Alerting
+
+### Tools
+
+* Prometheus
+* Grafana
+* CloudWatch
+
+## 3. Traces
+
+Traces track a single request as it travels across multiple services.
+
+In a microservices architecture, a user request may pass through several services before a response is returned.
+
+### Example
+
+```text id="d2r8ny"
+User Request
+      ↓
+API Gateway
+      ↓
+Auth Service
+      ↓
+Product Service
+      ↓
+Database
+```
+
+A trace records the complete journey of the request and shows where delays or failures occur.
+
+### Purpose
+
+* Root cause analysis
+* Performance bottleneck identification
+* Understanding service dependencies
+
+### Tools
+
+* Jaeger
+* Zipkin
+* OpenTelemetry
+
+# RED Method
+
+RED is a popular monitoring methodology used for APIs and microservices.
+
+## R - Rate
+
+Measures the number of requests handled per second.
+
+### Example
+
+```text id="n6w3cz"
+500 Requests/Second
+```
+
+## E - Errors
+
+Measures the number or percentage of failed requests.
+
+### Example
+
+```text id="e5j8fv"
+Error Rate = 2%
+```
+
+## D - Duration
+
+Measures how long requests take to complete.
+
+### Example
+
+```text id="h4s1mq"
+Average Response Time = 200ms
+```
+
+# Observability in Our Project
+
+In our microservices project:
+
+* Logs will help us troubleshoot application and infrastructure issues.
+* Metrics will be collected using Prometheus and visualized in Grafana.
+* Traces will help track requests across multiple services.
+* RED metrics (Rate, Errors, Duration) will be used to monitor API performance and reliability.
+
+### Interview Answer
+
+Observability is the ability to understand the health and behavior of a system through Logs, Metrics, and Traces. Logs provide detailed event information, Metrics provide numerical performance data over time, and Traces track requests across multiple services. Together, they help teams monitor applications, identify bottlenecks, troubleshoot failures, and improve reliability. A commonly used monitoring approach is RED, which focuses on Request Rate, Error Rate, and Request Duration.
+
+# Deployment Strategies
+
+When deploying a new feature or application version, the goal is to release it safely without affecting existing users. The choice of deployment strategy depends on factors such as risk tolerance, traffic volume, business requirements, and rollback needs.
+
+## 1. Recreate Strategy
+
+In the Recreate strategy, all existing application instances are stopped before the new version is deployed.
+
+### Process
+
+```text id="w8m3pa"
+Old Version Running
+        ↓
+Stop All Instances
+        ↓
+Deploy New Version
+        ↓
+Start New Instances
+```
+
+### Advantages
+
+* Simple to implement
+* No version compatibility issues
+
+### Disadvantages
+
+* Causes downtime during deployment
+
+### Use Case
+
+* Internal tools
+* Development environments
+* Non-critical applications
+
+## 2. Rolling Update Strategy
+
+Rolling Update replaces application instances gradually, one at a time.
+
+### Process
+
+```text id="r5k9ex"
+Pod v1
+Pod v1
+Pod v1
+      ↓
+Pod v2
+Pod v1
+Pod v1
+      ↓
+Pod v2
+Pod v2
+Pod v1
+      ↓
+Pod v2
+Pod v2
+Pod v2
+```
+
+### Advantages
+
+* No downtime
+* Resource efficient
+* Default Kubernetes deployment strategy
+
+### Disadvantages
+
+* Old and new versions run simultaneously
+* Rollback may take time
+
+### Use Case
+
+* Most production Kubernetes workloads
+
+## 3. Blue-Green Deployment
+
+Blue-Green deployment maintains two identical environments running side by side.
+
+### Components
+
+* Blue Environment → Current production version
+* Green Environment → New version
+
+### Process
+
+```text id="j7v2ny"
+Users
+   ↓
+Blue Environment (Live)
+
+Deploy New Version
+        ↓
+Green Environment
+        ↓
+Switch Traffic
+        ↓
+Green Becomes Production
+```
+
+### Advantages
+
+* Near-zero downtime
+* Instant rollback
+* Easy testing before switching traffic
+
+### Disadvantages
+
+* Requires two complete environments
+* Higher infrastructure cost
+
+### Use Case
+
+* Critical production applications
+* Banking systems
+* E-commerce platforms
+
+## 4. Canary Deployment
+
+Canary deployment releases the new version to a small percentage of users first.
+
+### Process
+
+```text id="f3q8lb"
+Version 1 = 90%
+Version 2 = 10%
+```
+
+Monitor application health and business metrics before increasing traffic.
+
+### Traffic Progression
+
+```text id="m6d4wc"
+10%
+ ↓
+20%
+ ↓
+30%
+ ↓
+50%
+ ↓
+75%
+ ↓
+100%
+```
+
+### Advantages
+
+* Reduced deployment risk
+* Real user testing
+* Easier issue detection
+
+### Disadvantages
+
+* More complex traffic management
+* Requires monitoring and observability
+
+### Use Case
+
+* Large-scale applications
+* High-traffic production systems
+* Continuous delivery environments
+
+# Strategy Comparison
+
+| Strategy       | Downtime | Rollback  | Cost   | Risk   |
+| -------------- | -------- | --------- | ------ | ------ |
+| Recreate       | Yes      | Easy      | Low    | High   |
+| Rolling Update | No       | Moderate  | Low    | Medium |
+| Blue-Green     | No       | Very Easy | High   | Low    |
+| Canary         | No       | Easy      | Medium | Lowest |
+
+# Interview Answer
+
+Deployment strategies are techniques used to release new application versions safely. Recreate deployments stop the old version and start the new version, causing downtime. Rolling Updates replace instances gradually with no downtime and are the default strategy in Kubernetes. Blue-Green deployments maintain two identical environments and switch traffic between them, enabling instant rollback. Canary deployments release changes to a small percentage of users first, monitor system behavior, and gradually increase traffic, making them one of the safest deployment approaches for production environments.
+
+# GitOps
+
+GitOps is an operational framework that uses Git as the single source of truth for both application deployments and infrastructure configuration. Any desired state changes are made through Git, and the cluster automatically synchronizes itself to match the configuration stored in the repository.
+
+## How GitOps Works
+
+GitOps relies on a deployment tool such as ArgoCD.
+
+### Workflow
+
+```text id="k7x2pm"
+Developer
+    ↓
+Git Repository
+    ↓
+ArgoCD Watches Repository
+    ↓
+Detects Changes
+    ↓
+Applies Changes to Kubernetes Cluster
+```
+
+### Key Characteristics
+
+* Git stores the desired state.
+* ArgoCD runs inside the Kubernetes cluster.
+* ArgoCD continuously monitors Git repositories.
+* Any change committed to Git is automatically synchronized to the cluster.
+
+## ArgoCD
+
+ArgoCD is a GitOps continuous delivery tool for Kubernetes.
+
+### Responsibilities
+
+* Watches Git repositories.
+* Detects configuration changes.
+* Synchronizes Kubernetes resources.
+* Monitors application health.
+* Performs automatic rollbacks when configured.
+
+### Benefits
+
+* Automated deployments
+* Declarative infrastructure
+* Improved consistency
+* Reduced manual operations
+
+## Drift Handling
+
+Configuration Drift occurs when the actual cluster state differs from the desired state stored in Git.
+
+### Example
+
+```text id="h8r5tw"
+Git:
+Replicas = 3
+
+Cluster:
+Replicas = 5 (Manual Change)
+```
+
+### What Happens?
+
+```text id="m3q9vd"
+Manual Cluster Change
+        ↓
+ArgoCD Detects Drift
+        ↓
+Cluster Reverted
+        ↓
+Matches Git State Again
+```
+
+### Benefit
+
+Ensures the cluster always matches the approved configuration stored in Git.
+
+# Deployment Approaches
+
+## 1. Push-Based Deployment
+
+Traditional CI/CD follows a push-based model.
+
+### Workflow
+
+```text id="y2w7kc"
+Developer
+    ↓
+Git
+    ↓
+CI Pipeline
+    ↓
+Push Changes to Cluster
+```
+
+### Examples
+
+* Jenkins
+* GitHub Actions
+* GitLab CI/CD
+
+### Limitation
+
+The CI system requires direct access to the Kubernetes cluster.
+
+## 2. Pull-Based Deployment (GitOps)
+
+GitOps uses a pull-based model.
+
+### Workflow
+
+```text id="r6p4zn"
+Developer
+    ↓
+Git Repository
+    ↓
+ArgoCD
+    ↓
+Pulls Changes
+    ↓
+Applies to Cluster
+```
+
+### Security Advantages
+
+* Cluster is not directly exposed to CI pipelines.
+* No external system requires cluster-admin access.
+* Reduced attack surface.
+* Better separation of responsibilities.
+
+# Benefits of GitOps
+
+## 1. Full Audit Trail
+
+Every infrastructure and deployment change is tracked through Git commits.
+
+### Benefits
+
+* Who made the change?
+* When was it made?
+* Why was it made?
+
+All answers are available through Git history and Pull Requests.
+
+## 2. Easy Rollback
+
+If a deployment fails:
+
+```text id="c4t8ex"
+Git Revert
+      ↓
+ArgoCD Sync
+      ↓
+Previous Version Restored
+```
+
+Rollback becomes as simple as reverting a Git commit.
+
+## 3. Infrastructure as Code
+
+All Kubernetes manifests, Helm charts, and configurations are stored in version control.
+
+### Benefits
+
+* Consistency
+* Reproducibility
+* Collaboration
+* Disaster recovery
+
+## 4. Complete Change History
+
+Git becomes the single source of truth for the entire infrastructure lifecycle.
+
+Every change is:
+
+* Version controlled
+* Reviewed through PRs
+* Auditable
+* Reversible
+
+# GitOps in Our Project
+
+In our project:
+
+* ArgoCD will be used as the GitOps deployment tool.
+* Kubernetes manifests will be stored in Git.
+* ArgoCD will continuously monitor the repository.
+* Any approved change merged into Git will automatically be deployed to the Kubernetes cluster.
+* Drift detection will ensure manual changes are reverted.
+* Rollbacks can be performed easily through Git revert operations.
+
+# Interview Answer
+
+GitOps is a deployment methodology that uses Git as the single source of truth for infrastructure and application configurations. Tools such as ArgoCD continuously monitor Git repositories and synchronize the Kubernetes cluster to match the desired state defined in Git. Unlike traditional push-based CI/CD pipelines, GitOps follows a pull-based approach where the cluster pulls changes from Git, improving security and reducing the attack surface. GitOps provides benefits such as automated deployments, drift detection, full auditability, easy rollbacks, and complete infrastructure version control.
