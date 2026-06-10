@@ -9,6 +9,270 @@ This architecture follows a microservices pattern.
 - Monitoring is implemented using Prometheus for metrics collection and Grafana for visualization. 
 - This design improves scalability, fault isolation, maintainability, and allows independent deployments of services.
 
+
+- Order Service
+- User Service
+
+Each microservice is independently deployable, follows the single responsibility principle, and manages its own business logic.
+
+The services store and retrieve data from **PostgreSQL** databases.
+
+For observability:
+
+- **Prometheus** collects metrics from all services.
+- **Grafana** provides dashboards to visualize system health and performance.
+
+This architecture provides:
+
+- Scalability
+- Fault Isolation
+- Maintainability
+- Independent Deployments
+- Better Monitoring and Observability
+
+---
+
+## Request Flow
+
+```text
+User
+  │
+  ▼
+React Frontend
+  │
+  ▼
+Nginx (Reverse Proxy)
+  │
+  ▼
+API Gateway
+  │
+  ├── Auth Service
+  ├── Product Service
+  ├── Order Service
+  └── User Service
+          │
+          ▼
+      PostgreSQL
+```
+
+# Interview Questions & Answers
+
+## 1. Why did you choose Microservices instead of Monolithic Architecture?
+
+Microservices allow:
+
+- Independent deployment
+- Independent scaling
+- Easier maintenance
+- Better fault isolation
+
+If one service fails, the entire application does not necessarily go down.
+
+## 2. What is the purpose of the API Gateway?
+
+The API Gateway acts as a single entry point for all client requests.
+
+Responsibilities:
+
+- Request Routing
+- Authentication
+- Authorization
+- Rate Limiting
+- Logging
+- Security
+
+Example:
+
+```text
+/api/auth     → Auth Service
+/api/products → Product Service
+/api/orders   → Order Service
+```
+
+## 3. Why do we need Nginx?
+
+### Answer
+
+Nginx is used as a reverse proxy.
+
+Responsibilities:
+
+- Serve React Application
+- SSL/TLS Termination
+- Load Balancing
+- Reverse Proxy
+- Routing Requests
+
+## 4. How does the Frontend communicate with Backend Services?
+
+### Answer
+
+The frontend communicates only with the API Gateway.
+
+```text
+User
+ ↓
+React Frontend
+ ↓
+Nginx
+ ↓
+API Gateway
+ ↓
+Microservices
+```
+
+This hides backend complexity from the client.
+
+## 5. How do Microservices communicate with each other?
+
+### Answer
+
+Microservices can communicate using:
+
+- REST APIs
+- gRPC
+- Kafka
+- RabbitMQ
+- Amazon SQS
+
+The communication mechanism depends on business requirements.
+
+## 6. Why separate Auth, Product, and Order Services?
+
+### Answer
+
+Each service owns a specific business capability.
+
+Benefits:
+
+- Loose Coupling
+- Better Maintainability
+- Independent Scaling
+- Independent Deployments
+
+## 7. What happens if one Microservice fails?
+
+### Answer
+
+Other services continue functioning.
+
+Example:
+
+If Product Service fails:
+
+- User Login still works
+- User Profile still works
+
+This is called **Fault Isolation**.
+
+## 8. How would you scale this Architecture?
+
+### Answer
+
+Individual services can be scaled independently.
+
+Example:
+
+```text
+High Product Traffic
+       │
+       ▼
+Scale Product Service Only
+```
+
+No need to scale the entire application.
+
+## 9. Why use PostgreSQL?
+
+PostgreSQL provides:
+
+- ACID Compliance
+- Transactions
+- Strong Consistency
+- High Reliability
+- Advanced Indexing
+
+It is widely used for enterprise applications.
+
+## 10. How is Monitoring implemented?
+
+Monitoring is implemented using:
+
+### Prometheus
+
+- Scrapes Metrics
+- Stores Time-Series Data
+
+### Grafana
+
+- Displays Dashboards
+- Visualizes Metrics
+
+## 11. What Metrics do you monitor?
+
+Common metrics include:
+
+- API Response Time
+- Request Rate
+- Error Rate
+- CPU Usage
+- Memory Usage
+- Pod Restarts
+- Database Connections
+- Disk Utilization
+
+## 12. What is a `/metrics` Endpoint?
+
+A `/metrics` endpoint exposes application metrics in a Prometheus-compatible format.
+
+Example:
+
+```text
+/auth/metrics
+/products/metrics
+/orders/metrics
+```
+
+Prometheus scrapes these endpoints periodically.
+
+## 13. How would you troubleshoot a Slow Application?
+
+Steps:
+
+1. Check Grafana Dashboards
+2. Review API Latency
+3. Analyze Error Rates
+4. Check CPU and Memory Usage
+5. Review Application Logs
+6. Verify Database Performance
+7. Check Pod Health
+
+## 14. What are the advantages of this Architecture?
+
+- Independent Deployments
+- Better Scalability
+- Fault Isolation
+- High Availability
+- Easier Maintenance
+- Team Autonomy
+- Improved Monitoring
+
+### 15. If deployed on Kubernetes, what benefits would Kubernetes provide?
+
+Kubernetes provides:
+
+- Container Orchestration
+- Auto Scaling
+- Service Discovery
+- Self-Healing
+- Rolling Updates
+- Load Balancing
+- High Availability
+
+### Strong Interview Closing Statement
+
+> This architecture follows modern cloud-native principles by combining microservices, API Gateway, containerization, Kubernetes orchestration, GitOps deployment, and observability tools such as Prometheus and Grafana. It enables scalable, resilient, and independently deployable services while providing complete visibility into application health, performance, and reliability.
+
 ## Workflow-1
 ![](/ai-ops-project/images/workflow-1.png)
 
