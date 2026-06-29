@@ -339,6 +339,132 @@ Add:
 
 Save and build project.
 
+## Using pipeline
+
+```bash
+pipeline {
+
+    agent any
+
+    environment {
+
+        BUCKET_NAME = "ci-cd-project-5-24-2026"
+
+        TOMCAT_URL = "http://<EC2-PUBLIC-IP>:9090"
+
+        TOMCAT_CREDENTIALS = credentials('tomcat-creds')
+
+    }
+
+    tools {
+
+        maven 'Maven'
+
+        jdk 'JDK21'
+
+    }
+
+    stages {
+
+        stage('Checkout Source') {
+
+            steps {
+
+                git branch: 'main',
+                url: 'https://github.com/KastroVKiran/tomcat-app-kastro.git'
+
+            }
+
+        }
+
+        stage('Build Application') {
+
+            steps {
+
+                sh 'mvn clean package'
+
+            }
+
+        }
+
+        stage('Archive Artifact') {
+
+            steps {
+
+                archiveArtifacts artifacts: 'target/*.war'
+
+            }
+
+        }
+
+        stage('Upload WAR to S3') {
+
+            steps {
+
+                sh """
+
+                aws s3 cp target/*.war \
+                s3://${BUCKET_NAME}/artifacts/
+
+                """
+
+            }
+
+        }
+
+        stage('Deploy to Tomcat') {
+
+            steps {
+
+                deploy adapters: [
+
+                    tomcat9(
+
+                        credentialsId: 'tomcat-creds',
+
+                        path: '',
+
+                        url: "${TOMCAT_URL}"
+
+                    )
+
+                ],
+
+                contextPath: null,
+
+                war: 'target/*.war'
+
+            }
+
+        }
+
+    }
+
+    post {
+
+        success {
+
+            echo "Deployment Successful"
+
+        }
+
+        failure {
+
+            echo "Pipeline Failed"
+
+        }
+
+        always {
+
+            cleanWs()
+
+        }
+
+    }
+
+}
+```
+
 ## Output
 
 1. Build Succeeded
