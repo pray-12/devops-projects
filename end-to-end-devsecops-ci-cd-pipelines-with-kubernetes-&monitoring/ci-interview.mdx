@@ -1,0 +1,741 @@
+# Q1. Explain your project from start to finish.
+
+My project is an end-to-end CI pipeline for deploying a React-based Zomato Clone application using Jenkins and DevSecOps tools.
+
+The complete flow is:
+
+```
+Developer
+     │
+     ▼
+GitHub Repository
+     │
+     ▼
+GitHub Webhook
+     │
+     ▼
+Jenkins Pipeline
+     │
+     ├── Clean Workspace
+     ├── Git Checkout
+     ├── SonarQube Analysis
+     ├── Quality Gate
+     ├── npm install
+     ├── OWASP Dependency Check
+     ├── Trivy File System Scan
+     ├── Docker Build
+     ├── Push Image to DockerHub
+     ├── Docker Scout Scan
+     ├── Deploy Container
+     └── Email Notification
+```
+
+Whenever a developer pushes code to GitHub, a webhook automatically triggers Jenkins.
+
+Jenkins checks out the latest code, performs static code analysis using SonarQube, verifies the Quality Gate, installs Node.js dependencies, scans dependencies using OWASP Dependency Check, performs a filesystem scan using Trivy, builds a Docker image, pushes it to DockerHub, performs an additional image analysis using Docker Scout, deploys the application as a Docker container, and finally sends an email notification with the build status.
+
+This pipeline ensures automation, code quality, security scanning, containerization, and deployment.
+
+---
+
+## Follow-up Questions
+
+### Why did you include security scans before Docker Build?
+
+Because if vulnerabilities are found early, we can stop the pipeline before spending time building and pushing Docker images.
+
+This follows the Shift Left Security approach.
+
+---
+
+### Why deploy after Docker Scout?
+
+Docker Scout analyzes the final Docker image.
+
+Only after ensuring the image is acceptable do we deploy it.
+
+---
+
+# Q2. Why did you choose a React (Zomato) application?
+
+## Answer
+
+The primary objective of this project was to demonstrate a complete CI pipeline rather than developing a backend application.
+
+A React application was chosen because:
+
+- It is lightweight.
+- It builds quickly.
+- It uses npm, allowing dependency management.
+- It can be containerized easily.
+- It is ideal for demonstrating DevSecOps tools such as SonarQube, OWASP, Trivy, Docker, and Jenkins.
+
+Since my goal was to learn CI/CD and DevSecOps, the application complexity was less important than the automation pipeline.
+
+---
+
+## Interview Tip
+
+If the interviewer asks why there is no backend, say:
+
+> The objective was to demonstrate the CI pipeline and DevSecOps workflow. The same pipeline can easily be extended to full-stack applications by adding backend build, testing, and deployment stages.
+
+---
+
+# Q3. What problem does your CI pipeline solve?
+
+## Answer
+
+Before CI, developers had to manually:
+
+- Clone repositories
+- Install dependencies
+- Run quality checks
+- Perform security scans
+- Build Docker images
+- Push images
+- Deploy applications
+
+This process was time-consuming and prone to human errors.
+
+The CI pipeline automates all these tasks.
+
+Benefits include:
+
+- Faster delivery
+- Consistent builds
+- Early bug detection
+- Automated security checks
+- Reduced manual effort
+- Standardized deployment process
+
+---
+
+## Real-world Benefit
+
+Instead of spending 20–30 minutes manually building and deploying, the entire process happens automatically whenever code is pushed.
+
+---
+
+# Q4. Explain your architecture.
+
+## Answer
+
+The architecture consists of four main components:
+
+### 1. Source Code Management
+
+GitHub stores the React application source code.
+
+Whenever code is pushed, GitHub sends a webhook to Jenkins.
+
+---
+
+### 2. Continuous Integration
+
+Jenkins performs:
+
+- Checkout
+- SonarQube Analysis
+- Quality Gate
+- npm install
+- OWASP Dependency Check
+- Trivy Filesystem Scan
+- Docker Build
+- DockerHub Push
+- Docker Scout Scan
+
+---
+
+### 3. Deployment
+
+Jenkins runs:
+
+```bash
+docker run -d \
+--name zomato-app \
+-p 3000:3000 \
+pray12/zomato-app:latest
+```
+
+This starts the application inside a Docker container.
+
+---
+
+### 4. Notification
+
+After completion, Jenkins sends an HTML email containing:
+
+- Build Status
+- Build Number
+- Build URL
+- Trivy Report
+
+---
+
+# Q5. Which AWS services did you use?
+
+## Answer
+
+For this project I primarily used:
+
+- EC2 (Jenkins Server)
+- Security Groups
+- Elastic IP
+- VPC
+- Internet Gateway
+
+Jenkins, SonarQube, Docker, OWASP, Trivy, and Docker Scout were all installed on the EC2 instance.
+
+GitHub was used as the source code repository.
+
+DockerHub was used as the image registry.
+
+---
+
+## Follow-up
+
+### Why only EC2?
+
+This project focuses on CI.
+
+In the next phase, I can extend it using:
+
+- Amazon ECR
+- Amazon EKS
+- Application Load Balancer
+- Route53
+- ACM
+
+---
+
+# Q6. Why Jenkins?
+
+## Answer
+
+Jenkins is an open-source automation server widely used for CI/CD.
+
+I selected Jenkins because:
+
+- Huge plugin ecosystem
+- Easy GitHub integration
+- Supports Pipeline as Code
+- Excellent Docker integration
+- Strong community support
+- Easy integration with SonarQube, OWASP, Trivy, DockerHub, and email notifications
+
+Everything required for this project could be integrated within a single pipeline.
+
+---
+
+## Interview Tip
+
+Mention Pipeline as Code.
+
+Interviewers like hearing that the Jenkinsfile is version-controlled together with the application code.
+
+---
+
+# Q7. Why not GitHub Actions?
+
+## Answer
+
+GitHub Actions is also an excellent CI/CD platform.
+
+However, I chose Jenkins because:
+
+- It provides greater flexibility.
+- Most enterprises still use Jenkins.
+- It has mature plugin support.
+- It allows complete server-level customization.
+- It integrates well with self-hosted infrastructure.
+
+Since I wanted hands-on experience with enterprise DevOps tools, Jenkins was the better choice for this project.
+
+---
+
+## Follow-up
+
+Can this project be migrated to GitHub Actions?
+
+Yes.
+
+Every Jenkins stage can be converted into GitHub Actions workflows.
+
+The overall logic remains the same.
+
+---
+
+# Q8. Explain your pipeline in one minute.
+
+## Answer
+
+My project implements an automated CI pipeline.
+
+Whenever code is pushed to GitHub, Jenkins is triggered through a webhook.
+
+Jenkins cleans the workspace, checks out the latest code, performs static code analysis using SonarQube, validates the Quality Gate, installs dependencies, scans the project using OWASP Dependency Check and Trivy, builds a Docker image, pushes it to DockerHub, performs an image analysis using Docker Scout, deploys the application as a Docker container, and sends an email notification containing the build result.
+
+---
+
+# Q9. Explain your pipeline in five minutes.
+
+## Answer
+
+The pipeline begins when a developer pushes code to GitHub.
+
+GitHub immediately sends a webhook request to Jenkins.
+
+Jenkins starts the pipeline by cleaning the previous workspace.
+
+It clones the latest application source code.
+
+The source code is analyzed by SonarQube to detect bugs, vulnerabilities, and code smells.
+
+The pipeline waits for the Quality Gate.
+
+If the Quality Gate fails, the pipeline stops.
+
+If successful, npm installs all dependencies.
+
+OWASP Dependency Check scans all third-party libraries for known CVEs.
+
+Trivy performs a filesystem scan to detect secrets, vulnerable packages, and configuration issues.
+
+After all scans pass, Docker builds the application image.
+
+The image is tagged and pushed to DockerHub.
+
+Docker Scout analyzes the pushed image for vulnerabilities and optimization recommendations.
+
+Finally, Jenkins deploys the Docker container and sends an HTML email with the pipeline status and attached Trivy report.
+
+This automated workflow reduces manual effort, improves code quality, and ensures security checks are performed consistently before deployment.
+
+---
+
+# Q10. If I push code to GitHub, what happens?
+
+## Answer
+
+The sequence is:
+
+1. Developer pushes code.
+2. GitHub stores the latest commit.
+3. GitHub Webhook sends an HTTP request to Jenkins.
+4. Jenkins starts the pipeline automatically.
+5. Workspace is cleaned.
+6. Repository is cloned.
+7. SonarQube scans the code.
+8. Quality Gate verifies the results.
+9. npm installs dependencies.
+10. OWASP scans third-party libraries.
+11. Trivy scans the filesystem.
+12. Docker builds the image.
+13. Jenkins pushes the image to DockerHub.
+14. Docker Scout analyzes the image.
+15. Jenkins deploys the Docker container.
+16. Jenkins sends an email notification.
+
+The developer does not need to perform any manual deployment steps after pushing the code.
+
+# Git & GitHub Interview Questions (CI Project)
+
+## Q11. What happens internally after `git push`?
+
+### Answer
+
+When I run `git push`, the following sequence happens:
+
+1. I make changes in my local repository.
+2. I stage the files using `git add .`.
+3. I create a commit using `git commit -m "message"`.
+4. I push the commit to the remote GitHub repository using `git push origin master`.
+5. GitHub receives the new commit.
+6. GitHub checks whether any Webhook is configured for that repository.
+7. Since I configured a Jenkins Webhook, GitHub immediately sends an HTTP POST request to Jenkins.
+8. Jenkins receives the notification and starts the pipeline.
+9. Jenkins clones the latest source code from GitHub.
+10. The CI pipeline begins:
+    - SonarQube Analysis
+    - Quality Gate
+    - npm install
+    - OWASP Dependency Check
+    - Trivy File Scan
+    - Docker Build
+    - DockerHub Push
+    - Docker Scout
+    - Deploy Container
+11. After completion Jenkins sends an email notification.
+
+### Interview Tip
+
+A common misconception is that GitHub directly executes Jenkins.
+
+It does **not**.
+
+GitHub only sends a notification.
+
+Jenkins performs the entire build process.
+
+---
+
+## Q12. What is GitHub Webhook?
+
+### Answer
+
+A GitHub Webhook is an automated notification mechanism.
+
+Whenever an event occurs in GitHub (like Push, Pull Request, Merge, Release, etc.), GitHub sends an HTTP POST request to another application.
+
+In our project, Jenkins exposes an endpoint:
+
+```
+http://<jenkins-ip>:8080/github-webhook/
+```
+
+Whenever I push code, GitHub sends a POST request to this endpoint.
+
+Jenkins receives the request and immediately starts the CI pipeline.
+
+### Why is it needed?
+
+Without Webhooks, Jenkins would never know that code has changed.
+
+The Webhook acts as a trigger.
+
+---
+
+## Q13. Why did you use Webhook instead of Poll SCM?
+
+### Answer
+
+Both trigger Jenkins automatically, but they work differently.
+
+### Poll SCM
+
+- Jenkins continuously checks GitHub.
+- It runs every few minutes.
+- Creates unnecessary network traffic.
+- Wastes CPU resources.
+- Slower.
+
+Example:
+
+```
+Every 5 minutes
+
+Jenkins
+     │
+     ├── Any new code?
+     │
+     ├── Any new code?
+     │
+     ├── Any new code?
+```
+
+Even when there are no commits, Jenkins keeps checking.
+
+---
+
+### GitHub Webhook
+
+GitHub itself informs Jenkins immediately after a push.
+
+```
+Developer
+     │
+git push
+     │
+GitHub
+     │
+HTTP POST
+     │
+Jenkins
+```
+
+Advantages
+
+- Instant trigger
+- Less CPU usage
+- Less network traffic
+- Real-time build
+
+That's why Webhook is preferred in production.
+
+---
+
+## Q14. How does Jenkins know which branch to build?
+
+### Answer
+
+During the Git Checkout stage we specify the repository and branch.
+
+Example:
+
+```groovy
+git branch: 'master',
+    url: 'https://github.com/pray-12/DevOps-Project-Zomato-Kastro.git'
+```
+
+When Jenkins receives the Webhook, it checks out the specified branch.
+
+If I change it to:
+
+```groovy
+branch: 'main'
+```
+
+Jenkins builds only the `main` branch.
+
+In Multibranch Pipelines, Jenkins can automatically discover multiple branches.
+
+---
+
+## Q15. How do you secure GitHub Webhooks?
+
+### Answer
+
+GitHub Webhooks should never be left open.
+
+Some common security methods are:
+
+### 1. Secret Token
+
+GitHub generates a secret.
+
+Jenkins verifies the incoming request using the same secret.
+
+If the secret doesn't match,
+
+the request is rejected.
+
+---
+
+### 2. HTTPS
+
+Webhook traffic should always use HTTPS.
+
+This prevents attackers from intercepting requests.
+
+---
+
+### 3. Firewall / Security Groups
+
+Allow only GitHub's IP ranges to access Jenkins.
+
+Block everyone else.
+
+---
+
+### 4. Authentication
+
+Only authorized repositories should trigger Jenkins.
+
+---
+
+### In my project
+
+I configured:
+
+- GitHub Webhook
+- Jenkins GitHub plugin
+- Security Group allowing required traffic
+- Jenkins credentials for repository access
+
+---
+
+## Q16. What happens if GitHub is down?
+
+### Answer
+
+If GitHub becomes unavailable:
+
+- Developers cannot push code.
+- Webhooks are not sent.
+- Jenkins cannot clone the repository.
+- Pipeline will not start.
+
+Existing deployments continue to run because the application is already deployed.
+
+Only new deployments stop.
+
+Once GitHub becomes available again, developers can push the changes and the pipeline resumes.
+
+---
+
+## Q17. What if the GitHub Webhook is not triggering?
+
+### Answer
+
+This is a common interview troubleshooting question.
+
+### Step 1
+
+Go to
+
+GitHub
+
+→ Settings
+
+→ Webhooks
+
+Check Recent Deliveries.
+
+If the response is **200 OK**, GitHub successfully reached Jenkins.
+
+---
+
+### Step 2
+
+Verify the Webhook URL.
+
+Correct format:
+
+```
+http://<jenkins-ip>:8080/github-webhook/
+```
+
+Common mistakes:
+
+- Missing `/github-webhook/`
+- Wrong port
+- Wrong IP
+- Using HTTPS without SSL configured
+
+---
+
+### Step 3
+
+Check Jenkins.
+
+Ensure the **GitHub Integration** plugin is installed.
+
+---
+
+### Step 4
+
+Verify Jenkins Job Configuration.
+
+Make sure:
+
+```
+GitHub hook trigger for GITScm polling
+```
+
+is enabled.
+
+---
+
+### Step 5
+
+Check the Jenkins logs.
+
+```
+Manage Jenkins
+
+↓
+
+System Log
+```
+
+Look for Webhook-related errors.
+
+---
+
+### Step 6
+
+Verify the Security Group.
+
+Allow inbound traffic on:
+
+```
+TCP 8080
+```
+
+---
+
+### Step 7
+
+Check if Jenkins is running.
+
+```
+systemctl status jenkins
+```
+
+---
+
+### Step 8
+
+Test the Webhook manually.
+
+```
+curl http://<jenkins-ip>:8080/github-webhook/
+```
+
+---
+
+### Real issue I faced
+
+Initially, my pipeline didn't trigger automatically after a push.
+
+I checked the Webhook configuration, enabled **GitHub hook trigger for GITScm polling**, corrected the repository branch configuration, and verified that Jenkins was reachable from GitHub. After fixing those settings, the Webhook started triggering the pipeline automatically.
+
+---
+
+## Q18. Why do we have a Git Checkout stage?
+
+### Answer
+
+The Jenkins server does not automatically have the application's source code.
+
+The **Git Checkout** stage downloads the latest code from GitHub into the Jenkins workspace.
+
+Example:
+
+```groovy
+stage("Git Checkout") {
+    steps {
+        git branch: 'master',
+            url: 'https://github.com/pray-12/DevOps-Project-Zomato-Kastro.git'
+    }
+}
+```
+
+After checkout, the workspace contains:
+
+```
+Dockerfile
+
+package.json
+
+package-lock.json
+
+src/
+
+public/
+
+README.md
+
+Jenkinsfile
+```
+
+All subsequent stages—SonarQube, npm install, OWASP Dependency Check, Trivy, Docker Build, Docker Push, and Deployment—use these files from the workspace.
+
+Without the Git Checkout stage, Jenkins would have no source code to analyze, build, or deploy.
+
+---
+
+# Quick Interview Summary
+
+| Question | One-line Answer |
+|-----------|-----------------|
+| What happens after `git push`? | GitHub receives the commit, sends a Webhook to Jenkins, Jenkins starts the CI pipeline. |
+| What is a GitHub Webhook? | An HTTP POST notification sent by GitHub to Jenkins when an event occurs. |
+| Why Webhook over Poll SCM? | Webhooks are event-driven, faster, and use fewer resources. |
+| How does Jenkins know the branch? | The branch is specified in the Git Checkout configuration or Jenkinsfile. |
+| How do you secure Webhooks? | Use secret tokens, HTTPS, firewall rules, and authentication. |
+| What if GitHub is down? | New builds cannot start, but existing deployments continue running. |
+| What if the Webhook doesn't trigger? | Check Recent Deliveries, Webhook URL, Jenkins trigger, plugins, logs, and network connectivity. |
+| Why Git Checkout? | To download the latest source code into the Jenkins workspace for all subsequent CI stages. |
+
