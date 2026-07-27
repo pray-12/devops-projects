@@ -739,3 +739,2489 @@ Without the Git Checkout stage, Jenkins would have no source code to analyze, bu
 | What if the Webhook doesn't trigger? | Check Recent Deliveries, Webhook URL, Jenkins trigger, plugins, logs, and network connectivity. |
 | Why Git Checkout? | To download the latest source code into the Jenkins workspace for all subsequent CI stages. |
 
+# Q19. Explain your Jenkinsfile line by line.
+
+## Answer
+
+My Jenkinsfile is written using **Declarative Pipeline syntax**, which organizes the CI pipeline into multiple stages. Each stage performs one specific task in the software delivery process.
+
+### 1. Pipeline Declaration
+
+```groovy
+pipeline {
+```
+
+This tells Jenkins that a new pipeline is starting.
+
+---
+
+### 2. Agent
+
+```groovy
+agent any
+```
+
+This instructs Jenkins to run the pipeline on any available Jenkins agent (node).
+
+---
+
+### 3. Tools
+
+```groovy
+tools {
+    jdk 'jdk21'
+    nodejs 'node23'
+}
+```
+
+This automatically configures the required tools before the pipeline starts.
+
+In my project:
+
+- JDK 21 is used for SonarScanner.
+- NodeJS 23 is used to run npm commands.
+
+---
+
+### 4. Environment Variables
+
+```groovy
+environment {
+    SCANNER_HOME = tool 'sonar-scanner'
+}
+```
+
+This stores the Sonar Scanner installation path in an environment variable so it can be reused later in the pipeline.
+
+---
+
+### 5. Stages
+
+```groovy
+stages {
+```
+
+The pipeline is divided into multiple stages, making it easier to read, monitor, and troubleshoot.
+
+The stages in my pipeline are:
+
+- Clean Workspace
+- Git Checkout
+- SonarQube Analysis
+- Quality Gate
+- Install NPM Dependencies
+- OWASP Dependency Check
+- Trivy File System Scan
+- Build Docker Image
+- Push Image to DockerHub
+- Docker Scout Scan
+- Deploy Container
+
+---
+
+### 6. Clean Workspace
+
+```groovy
+cleanWs()
+```
+
+Deletes the previous build files so every build starts from a clean workspace.
+
+---
+
+### 7. Git Checkout
+
+```groovy
+git branch: 'master', url: 'https://github.com/pray-12/DevOps-Project-Zomato-Kastro.git'
+```
+
+Downloads the latest source code from the GitHub repository into the Jenkins workspace.
+
+---
+
+### 8. SonarQube Analysis
+
+```groovy
+withSonarQubeEnv('sonar-server') {
+    sh "$SCANNER_HOME/bin/sonar-scanner ..."
+}
+```
+
+Runs SonarScanner to perform static code analysis and uploads the results to the SonarQube server.
+
+---
+
+### 9. Quality Gate
+
+```groovy
+waitForQualityGate()
+```
+
+Waits for SonarQube to complete the analysis and checks whether the project passes the configured Quality Gate.
+
+---
+
+### 10. Install NPM Dependencies
+
+```groovy
+sh "npm install"
+```
+
+Downloads and installs all Node.js packages defined in the `package.json` file.
+
+---
+
+### 11. OWASP Dependency Check
+
+```groovy
+dependencyCheck(...)
+```
+
+Scans project dependencies for known security vulnerabilities using the OWASP Dependency Check plugin.
+
+---
+
+### 12. Trivy File System Scan
+
+```groovy
+sh "trivy fs . > trivy.txt"
+```
+
+Scans the project files for vulnerabilities, secrets, and misconfigurations and saves the report to `trivy.txt`.
+
+---
+
+### 13. Build Docker Image
+
+```groovy
+docker build -t pray12/zomato-app:latest .
+```
+
+Builds a Docker image of the application using the Dockerfile.
+
+---
+
+### 14. Push Image to DockerHub
+
+```groovy
+withDockerRegistry(...) {
+    docker push
+}
+```
+
+Authenticates with DockerHub and pushes the newly built Docker image to the DockerHub repository.
+
+---
+
+### 15. Docker Scout Scan
+
+```groovy
+docker scout quickview
+docker scout cves
+docker scout recommendations
+```
+
+Analyzes the Docker image for vulnerabilities and provides recommendations to improve its security.
+
+---
+
+### 16. Deploy Container
+
+```groovy
+docker run -d --name zomato-app -p 3000:3000 ...
+```
+
+Starts a Docker container from the image and makes the application accessible on port **3000**.
+
+---
+
+### 17. Post Section
+
+```groovy
+post {
+    always {
+        emailext(...)
+    }
+}
+```
+
+The `post` block runs after the pipeline finishes, regardless of success or failure.
+
+In my pipeline it:
+
+- Sends an email notification.
+- Attaches the Trivy scan report.
+- Includes the build status, build number, and Jenkins build URL.
+
+---
+
+## Interview Summary
+
+> "My Jenkinsfile is a Declarative Pipeline that automates the complete CI workflow. It starts by configuring the required tools, cleans the workspace, checks out the latest code from GitHub, performs code quality analysis with SonarQube, installs project dependencies, runs OWASP and Trivy security scans, builds a Docker image, pushes it to DockerHub, scans the image using Docker Scout, deploys the application as a Docker container, and finally sends an email notification with the build results."
+
+# Jenkins Interview Questions & Answers (Q20–Q30)
+
+---
+
+# Q20. Why did you use a Declarative Pipeline?
+
+## Answer
+
+I used a **Declarative Pipeline** because it is easier to write, read, and maintain compared to a Scripted Pipeline. It provides a predefined structure using stages, steps, and post actions, making the pipeline more organized.
+
+It also has built-in features like:
+
+- Easy error handling
+- Better readability
+- Stage View visualization
+- Automatic syntax validation
+- Easier maintenance
+
+For CI/CD projects, Declarative Pipeline is the recommended approach.
+
+---
+
+# Q21. What is `agent any`?
+
+## Answer
+
+```groovy
+agent any
+```
+
+The `agent` specifies **where the pipeline should run**.
+
+`agent any` means Jenkins can execute the pipeline on **any available Jenkins node (agent)**.
+
+Since my project has only one Jenkins server, the pipeline runs on that server.
+
+If multiple Jenkins agents were available, Jenkins would automatically choose one that is free.
+
+---
+
+# Q22. What are Jenkins Stages?
+
+## Answer
+
+Stages divide a pipeline into logical steps.
+
+Each stage performs one specific task.
+
+In my project, the stages are:
+
+- Clean Workspace
+- Git Checkout
+- SonarQube Analysis
+- Quality Gate
+- Install NPM Dependencies
+- OWASP Dependency Check
+- Trivy File System Scan
+- Build Docker Image
+- Push Image to DockerHub
+- Docker Scout Scan
+- Deploy Container
+
+Stages help us:
+
+- Monitor build progress
+- Identify failures quickly
+- Restart from failed stages (in some cases)
+- Improve pipeline readability
+
+---
+
+# Q23. What is a Jenkins Workspace?
+
+## Answer
+
+A Jenkins Workspace is the directory where Jenkins stores all the files related to a build.
+
+It contains:
+
+- Source code
+- Dockerfile
+- package.json
+- node_modules
+- Build reports
+- Trivy report
+- Dependency Check report
+
+Example:
+
+```
+/var/lib/jenkins/workspace/Zomato-project
+```
+
+Every pipeline works inside its own workspace.
+
+---
+
+# Q24. Why did you use `cleanWs()`?
+
+## Answer
+
+```groovy
+cleanWs()
+```
+
+`cleanWs()` deletes all files from the previous build before starting a new build.
+
+This ensures:
+
+- No old source code remains
+- No old reports remain
+- No cached files affect the build
+- Every build starts from a clean environment
+
+Without cleaning the workspace, old files may cause unexpected build failures or incorrect scan results.
+
+---
+
+# Q25. Why did you use the `tools` block?
+
+## Answer
+
+```groovy
+tools {
+    jdk 'jdk21'
+    nodejs 'node23'
+}
+```
+
+The `tools` block automatically configures the required software before executing the pipeline.
+
+In my project:
+
+- JDK 21 is required for SonarScanner.
+- NodeJS 23 is required to run npm commands.
+
+Instead of manually setting environment paths, Jenkins automatically adds these tools to the system PATH.
+
+---
+
+# Q26. Why did you use the `environment` block?
+
+## Answer
+
+```groovy
+environment {
+    SCANNER_HOME = tool 'sonar-scanner'
+}
+```
+
+The `environment` block stores environment variables that can be reused throughout the pipeline.
+
+Instead of writing the Sonar Scanner path multiple times, I stored it in a variable called `SCANNER_HOME`.
+
+This improves:
+
+- Readability
+- Reusability
+- Maintainability
+
+---
+
+# Q27. Why did you use Jenkins Credentials?
+
+## Answer
+
+Sensitive information such as passwords and tokens should never be hardcoded inside the Jenkinsfile.
+
+Jenkins Credentials securely store:
+
+- DockerHub Username & Password
+- SonarQube Token
+- GitHub Token
+- SSH Keys
+- API Keys
+
+During pipeline execution, Jenkins injects these credentials only when required.
+
+This improves security and prevents secrets from being exposed in source code.
+
+---
+
+# Q28. Difference between Secret Text and Username/Password
+
+## Answer
+
+| Secret Text | Username & Password |
+|-------------|---------------------|
+| Stores a single value | Stores two values |
+| Used for API Tokens | Used for Login Credentials |
+| Example: SonarQube Token | Example: DockerHub Login |
+| Accessed as one environment variable | Accessed as username and password variables |
+
+### In my project
+
+**Secret Text**
+
+- SonarQube Token
+
+**Username & Password**
+
+- DockerHub Username
+- DockerHub Password
+
+---
+
+# Q29. What Jenkins plugins did you install?
+
+## Answer
+
+For my CI pipeline, I installed the following plugins:
+
+- Pipeline Plugin
+- Git Plugin
+- GitHub Plugin
+- Docker Plugin
+- Docker Pipeline Plugin
+- SonarQube Scanner Plugin
+- NodeJS Plugin
+- Eclipse Temurin (JDK) Plugin
+- OWASP Dependency Check Plugin
+- Email Extension Plugin
+- Workspace Cleanup Plugin
+- Credentials Plugin
+
+Each plugin provides a specific functionality required by the pipeline.
+
+---
+
+# Q30. How does Jenkins authenticate to DockerHub?
+
+## Answer
+
+I stored my DockerHub username and password securely in Jenkins Credentials.
+
+In the pipeline, I used:
+
+```groovy
+withDockerRegistry(credentialsId: 'docker') {
+    sh "docker push pray12/zomato-app:latest"
+}
+```
+
+Internally, Jenkins performs the following steps:
+
+1. Retrieves the DockerHub credentials from Jenkins Credentials.
+2. Executes `docker login` using those credentials.
+3. Authenticates with DockerHub.
+4. Pushes the Docker image to the repository.
+
+This method is secure because the credentials are encrypted and are never hardcoded in the Jenkinsfile.
+
+---
+
+# Interview Summary
+
+These Jenkins concepts are directly related to my Zomato CI project:
+
+- Declarative Pipeline
+- agent any
+- Stages
+- Workspace
+- cleanWs()
+- tools block
+- environment block
+- Jenkins Credentials
+- Secret Text vs Username/Password
+- Jenkins Plugins
+- DockerHub Authentication
+
+These are among the most commonly asked Jenkins interview questions for CI/CD projects.
+
+# SonarQube Interview Questions & Answers (Q31–Q40)
+
+---
+
+# Q31. Why did you use SonarQube?
+
+## Answer
+
+I used SonarQube to perform **Static Code Analysis** on my application before building and deploying it.
+
+It helps identify:
+- Bugs
+- Security Vulnerabilities
+- Code Smells
+- Duplicate Code
+- Code Coverage (if configured)
+
+By using SonarQube early in the pipeline, I can fix issues before deployment, improving code quality and security.
+
+---
+
+# Q32. What is Static Code Analysis?
+
+## Answer
+
+Static Code Analysis is the process of analyzing source code **without executing the application**.
+
+The scanner examines the code for:
+- Coding mistakes
+- Security issues
+- Best practice violations
+- Potential bugs
+
+Since the application is not run, it is called **Static Analysis**.
+
+---
+
+# Q33. What does SonarQube scan?
+
+## Answer
+
+SonarQube scans:
+
+- Source Code
+- Coding Standards
+- Bugs
+- Vulnerabilities
+- Code Smells
+- Duplicate Code
+- Maintainability
+- Reliability
+- Security Hotspots
+
+In my React project, it mainly scanned JavaScript and React files.
+
+---
+
+# Q34. Difference between Bugs, Vulnerabilities and Code Smells?
+
+## Answer
+
+| Bugs | Vulnerabilities | Code Smells |
+|------|-----------------|-------------|
+| Coding mistakes that may cause incorrect behavior | Security weaknesses that attackers can exploit | Poor coding practices that reduce maintainability |
+| Affect functionality | Affect security | Affect readability and maintainability |
+| Example: Null reference | Hardcoded password | Duplicate code |
+
+---
+
+# Q35. Explain Quality Gate.
+
+## Answer
+
+A **Quality Gate** is a set of conditions that the project must satisfy after SonarQube analysis.
+
+Examples include:
+- No Critical Bugs
+- No Critical Vulnerabilities
+- Maintainability Rating
+- Code Coverage threshold
+
+If all conditions are met, the Quality Gate passes; otherwise, it fails.
+
+---
+
+# Q36. Why is Quality Gate placed after SonarQube Analysis?
+
+## Answer
+
+SonarQube must first analyze the code and upload the results.
+
+Only after the analysis is complete can Jenkins check whether the project meets the Quality Gate conditions.
+
+So the sequence is:
+
+```
+Sonar Scan
+      ↓
+Upload Report
+      ↓
+Quality Gate
+      ↓
+Pass / Fail
+```
+
+---
+
+# Q37. What happens if the Quality Gate fails?
+
+## Answer
+
+If the Quality Gate fails:
+
+- Jenkins marks the stage as failed.
+- The pipeline can stop (based on configuration).
+- Docker image is not built.
+- Deployment does not proceed.
+
+This prevents low-quality or insecure code from reaching production.
+
+---
+
+# Q38. Why did your Quality Gate get stuck?
+
+## Answer
+
+In my project, the Quality Gate remained in the **IN_PROGRESS** state.
+
+The reason was that SonarQube could not notify Jenkins after completing the analysis because the **Webhook was not configured**.
+
+As a result, Jenkins kept waiting indefinitely.
+
+---
+
+# Q39. How did you fix it?
+
+## Answer
+
+I fixed the issue by configuring a **SonarQube Webhook**.
+
+In SonarQube:
+
+**Administration → Configuration → Webhooks**
+
+I added:
+
+```
+http://<jenkins-ip>:8080/sonarqube-webhook/
+```
+
+After adding the webhook:
+
+- SonarQube notified Jenkins automatically.
+- Jenkins received the Quality Gate result.
+- The pipeline continued successfully.
+
+---
+
+# Q40. What is report-task.txt?
+
+## Answer
+
+`report-task.txt` is a file generated by the SonarScanner after a successful analysis.
+
+It contains details such as:
+- Project Key
+- Server URL
+- Task ID
+- Dashboard URL
+
+Jenkins uses this file to track the analysis and wait for the Quality Gate result.
+
+If this file is missing, Jenkins cannot monitor the SonarQube analysis correctly.
+
+---
+
+# NodeJS & React Interview Questions (Q41–Q48)
+
+---
+
+# Q41. Why did you use NodeJS?
+
+## Answer
+
+My project is a React application, and React requires Node.js to install packages, run the development server, and build the application.
+
+Node.js provides the runtime needed for tools like npm and react-scripts.
+
+---
+
+# Q42. Why Node23 in Jenkins?
+
+## Answer
+
+I configured **NodeJS 23** in Jenkins using the Tools section so that every build uses the same Node.js version.
+
+This ensures a consistent build environment across all pipeline executions.
+
+Although my application can run on Node 18 or later, I used Node 23 because it was configured in Jenkins and was compatible with the project.
+
+---
+
+# Q43. Why run npm install?
+
+## Answer
+
+`npm install` downloads and installs all dependencies listed in `package.json`.
+
+It creates the `node_modules` directory so that the application has all required libraries before building.
+
+Without this step, the build would fail due to missing packages.
+
+---
+
+# Q44. What is package.json?
+
+## Answer
+
+`package.json` is the main configuration file for a Node.js project.
+
+It contains:
+- Project name
+- Version
+- Dependencies
+- Scripts
+- Metadata
+
+It tells npm which packages the project requires.
+
+---
+
+# Q45. What is package-lock.json?
+
+## Answer
+
+`package-lock.json` records the exact versions of all installed dependencies.
+
+This ensures that every developer and the Jenkins pipeline install the same package versions, resulting in consistent builds.
+
+---
+
+# Q46. Difference between dependencies and devDependencies?
+
+## Answer
+
+| dependencies | devDependencies |
+|--------------|-----------------|
+| Required to run the application | Required only during development |
+| Installed in production | Usually not installed in production |
+| Example: React | Example: ESLint, Jest |
+
+---
+
+# Q47. Why React build?
+
+## Answer
+
+The React build process creates an optimized production version of the application.
+
+During `npm run build`:
+- JavaScript is bundled.
+- Files are minified.
+- Assets are optimized.
+
+The generated build is faster and suitable for deployment.
+
+---
+
+# Q48. What happens during npm install?
+
+## Answer
+
+When `npm install` runs:
+
+1. Reads `package.json`.
+2. Downloads required packages from the npm registry.
+3. Resolves dependencies.
+4. Creates the `node_modules` directory.
+5. Generates or updates `package-lock.json` (if needed).
+
+After this step, the project is ready for building and execution.
+
+---
+
+# OWASP Dependency Check Interview Questions (Q49–Q57)
+
+---
+
+# Q49. Why did you use OWASP Dependency Check?
+
+## Answer
+
+I used OWASP Dependency Check to identify **known security vulnerabilities** in third-party libraries used by my project.
+
+It scans project dependencies against the National Vulnerability Database (NVD) and generates a vulnerability report.
+
+---
+
+# Q50. What does Dependency Check scan?
+
+## Answer
+
+It scans:
+
+- package.json
+- package-lock.json
+- npm packages
+- Third-party libraries
+
+It compares their versions with known CVEs from the NVD database.
+
+---
+
+# Q51. Why did the first scan take around 20 minutes?
+
+## Answer
+
+During the first execution, OWASP Dependency Check downloaded the latest vulnerability database from the **National Vulnerability Database (NVD)**.
+
+Since the database contains hundreds of thousands of vulnerability records, the initial download took a long time.
+
+---
+
+# Q52. Why did it become faster later?
+
+## Answer
+
+After the first scan, the vulnerability database was cached locally.
+
+Subsequent scans only downloaded incremental updates, making them much faster.
+
+---
+
+# Q53. What is CVE?
+
+## Answer
+
+CVE stands for **Common Vulnerabilities and Exposures**.
+
+Each publicly known security vulnerability is assigned a unique CVE ID, such as:
+
+```
+CVE-2025-12345
+```
+
+These IDs help identify and track security issues.
+
+---
+
+# Q54. What is NVD?
+
+## Answer
+
+NVD stands for **National Vulnerability Database**.
+
+It is maintained by the U.S. National Institute of Standards and Technology (NIST) and contains detailed information about publicly disclosed security vulnerabilities.
+
+OWASP Dependency Check uses this database during scans.
+
+---
+
+# Q55. Why use an NVD API Key?
+
+## Answer
+
+An NVD API Key increases the request rate limit when downloading vulnerability data.
+
+Without an API key:
+- Downloads are slower.
+- Requests may be rate-limited.
+- The first scan can take significantly longer.
+
+Using an API key speeds up database updates.
+
+---
+
+# Q56. Why not use only SonarQube?
+
+## Answer
+
+SonarQube and OWASP Dependency Check serve different purposes.
+
+- **SonarQube** analyzes the project's own source code.
+- **OWASP Dependency Check** analyzes third-party libraries for known vulnerabilities.
+
+Using both tools provides more comprehensive security coverage.
+
+---
+
+# Q57. What if OWASP finds a Critical vulnerability?
+
+## Answer
+
+If a Critical vulnerability is found:
+
+1. Review the report.
+2. Identify the affected dependency.
+3. Upgrade to a secure version if available.
+4. Re-run the scan.
+5. If necessary, configure the pipeline to fail on Critical vulnerabilities to prevent deployment.
+
+This ensures vulnerable dependencies are not promoted to production.
+
+# 7. Trivy Interview Questions & Answers (Q58–Q65)
+
+---
+
+# Q58. Why did you use Trivy?
+
+## Answer
+
+I used **Trivy** to scan my project and Docker image for security vulnerabilities before deployment.
+
+It helps detect:
+
+- Vulnerabilities
+- Secrets
+- Misconfigurations
+- License issues (optional)
+
+Using Trivy helps identify security problems early in the CI pipeline.
+
+---
+
+# Q59. Difference between Trivy FS Scan and Image Scan?
+
+## Answer
+
+| Trivy File System Scan | Trivy Image Scan |
+|------------------------|------------------|
+| Scans project source code | Scans Docker image |
+| Executed before Docker build | Executed after Docker build |
+| Detects secrets and vulnerable packages | Detects OS and application package vulnerabilities |
+| Command: `trivy fs .` | Command: `trivy image image-name` |
+
+---
+
+# Q60. What is Secret Scanning?
+
+## Answer
+
+Secret scanning checks the source code for accidentally committed sensitive information like:
+
+- AWS Access Keys
+- API Keys
+- SSH Keys
+- Passwords
+- Tokens
+
+If such secrets are pushed to GitHub, attackers may misuse them.
+
+---
+
+# Q61. What is Misconfiguration Scanning?
+
+## Answer
+
+Misconfiguration scanning checks whether infrastructure or application configuration follows security best practices.
+
+Examples:
+
+- Running containers as root
+- Public S3 buckets
+- Weak Docker configurations
+- Insecure Kubernetes YAML files
+
+---
+
+# Q62. Why scan the filesystem before Docker build?
+
+## Answer
+
+Scanning the filesystem detects vulnerabilities and secrets before creating the Docker image.
+
+This prevents insecure code from being packaged into the image, saving build time and improving security.
+
+---
+
+# Q63. Why scan the Docker Image?
+
+## Answer
+
+The Docker image contains:
+
+- Base OS
+- Installed packages
+- Application code
+
+Even if the source code is secure, the image may contain vulnerable operating system packages. Image scanning identifies these issues.
+
+---
+
+# Q64. What if Trivy reports Critical vulnerabilities?
+
+## Answer
+
+If Trivy finds Critical vulnerabilities:
+
+1. Review the report.
+2. Identify the affected package.
+3. Upgrade to a patched version.
+4. Rebuild the image.
+5. Re-run the scan.
+
+In production, the pipeline can be configured to fail if Critical vulnerabilities are detected.
+
+---
+
+# Q65. Can Trivy replace OWASP Dependency Check?
+
+## Answer
+
+No.
+
+They complement each other.
+
+- **OWASP Dependency Check** focuses on third-party application dependencies.
+- **Trivy** scans the filesystem, Docker images, secrets, and misconfigurations.
+
+Using both provides better security coverage.
+
+---
+
+# 8. Docker Interview Questions & Answers (Q66–Q75)
+
+---
+
+# Q66. Why did you use Docker?
+
+## Answer
+
+Docker packages the application and all its dependencies into a single container.
+
+This ensures the application runs consistently across development, testing, and production environments.
+
+---
+
+# Q67. Why did you use a Dockerfile?
+
+## Answer
+
+A Dockerfile contains the instructions to build a Docker image.
+
+It automates:
+
+- Base image selection
+- Dependency installation
+- Copying source code
+- Building the application
+- Starting the application
+
+---
+
+# Q68. Explain your Dockerfile line by line.
+
+## Answer
+
+```dockerfile
+FROM node:23-alpine
+```
+
+Uses Node.js 23 Alpine as the lightweight base image.
+
+---
+
+```dockerfile
+WORKDIR /app
+```
+
+Sets `/app` as the working directory inside the container.
+
+---
+
+```dockerfile
+COPY package*.json ./
+```
+
+Copies only dependency files first.
+
+---
+
+```dockerfile
+RUN npm install
+```
+
+Installs project dependencies.
+
+---
+
+```dockerfile
+COPY . .
+```
+
+Copies the remaining application source code.
+
+---
+
+```dockerfile
+RUN npm run build
+```
+
+Builds the React application.
+
+---
+
+```dockerfile
+EXPOSE 3000
+```
+
+Documents that the application listens on port 3000.
+
+---
+
+```dockerfile
+CMD ["npm","start"]
+```
+
+Starts the application when the container runs.
+
+---
+
+# Q69. Why node:23-alpine?
+
+## Answer
+
+I used **node:23-alpine** because:
+
+- It is lightweight.
+- Downloads faster.
+- Uses less storage.
+- Starts containers quickly.
+- Includes Node.js 23, matching my Jenkins environment.
+
+---
+
+# Q70. Why COPY package*.json first?
+
+## Answer
+
+Docker caches image layers.
+
+Since package files change less frequently than source code, copying them first allows Docker to reuse the cached `npm install` layer, reducing build time.
+
+---
+
+# Q71. Why RUN npm install before COPY . ?
+
+## Answer
+
+Installing dependencies before copying the source code improves Docker layer caching.
+
+If only the application code changes, Docker skips reinstalling dependencies, making builds much faster.
+
+---
+
+# Q72. Why EXPOSE 3000?
+
+## Answer
+
+`EXPOSE 3000` documents that the application listens on port 3000 inside the container.
+
+It does not publish the port; port mapping is done with `docker run -p`.
+
+---
+
+# Q73. Difference between CMD and ENTRYPOINT?
+
+## Answer
+
+| CMD | ENTRYPOINT |
+|------|------------|
+| Provides default command | Defines the main executable |
+| Can be overridden | Usually not overridden |
+| Used for default arguments | Used to always execute a command |
+
+In my Dockerfile, I used `CMD` because I only needed to specify the default startup command.
+
+---
+
+# Q74. Difference between Docker Image and Docker Container?
+
+## Answer
+
+| Docker Image | Docker Container |
+|--------------|------------------|
+| Blueprint | Running instance |
+| Read-only | Read-write |
+| Used to create containers | Executes the application |
+
+---
+
+# Q75. Why push the image to DockerHub?
+
+## Answer
+
+DockerHub stores Docker images centrally.
+
+By pushing the image:
+
+- It can be downloaded anywhere.
+- Other environments can deploy the same image.
+- Kubernetes can pull the image directly from DockerHub.
+
+---
+
+# 9. DockerHub Interview Questions & Answers (Q76–Q80)
+
+---
+
+# Q76. Why tag Docker images?
+
+## Answer
+
+Tags help identify different image versions.
+
+Examples:
+
+```
+latest
+
+v1.0
+
+v2.1
+
+production
+```
+
+This makes version management easier.
+
+---
+
+# Q77. Why use the latest tag?
+
+## Answer
+
+The `latest` tag points to the newest image.
+
+It simplifies deployments because Docker pulls the newest version automatically.
+
+However, in production, version-specific tags are generally recommended for better traceability.
+
+---
+
+# Q78. Why use a Docker Registry?
+
+## Answer
+
+A Docker Registry stores Docker images.
+
+Examples include:
+
+- DockerHub
+- Amazon ECR
+- Google Artifact Registry
+
+Registries make images available to other servers and deployment platforms.
+
+---
+
+# Q79. How does Jenkins log in to DockerHub?
+
+## Answer
+
+Jenkins retrieves the DockerHub username and password from **Jenkins Credentials**.
+
+It performs `docker login` using those credentials and then pushes the Docker image securely.
+
+---
+
+# Q80. Why use Jenkins Credentials?
+
+## Answer
+
+Credentials securely store sensitive information such as usernames, passwords, and tokens.
+
+This prevents secrets from being hardcoded into the Jenkinsfile or source code.
+
+---
+
+# 10. Docker Scout Interview Questions & Answers (Q81–Q84)
+
+---
+
+# Q81. What is Docker Scout?
+
+## Answer
+
+Docker Scout is a security analysis tool that scans Docker images for vulnerabilities and provides recommendations to improve image security.
+
+---
+
+# Q82. Why use Docker Scout after pushing the image?
+
+## Answer
+
+After the image is built and pushed, Docker Scout analyzes the final image that will actually be deployed.
+
+This verifies the security of the deployable artifact.
+
+---
+
+# Q83. Difference between Docker Scout and Trivy?
+
+## Answer
+
+| Docker Scout | Trivy |
+|---------------|--------|
+| Scans Docker images | Scans filesystem and images |
+| Provides image recommendations | Detects vulnerabilities, secrets, misconfigurations |
+| Docker-focused | Broader security scanner |
+
+---
+
+# Q84. Why did the docker scout command fail?
+
+## Answer
+
+In my project, the command failed because **Docker Scout was installed only for the root user**.
+
+The Jenkins service runs as the **jenkins** user, so it could not access the Docker Scout CLI plugin.
+
+I fixed the issue by installing Docker Scout so that the Jenkins user could access it and then restarting Jenkins.
+
+---
+
+# 11. Deployment Interview Questions & Answers (Q85–Q89)
+
+---
+
+# Q85. Explain your deployment stage.
+
+## Answer
+
+After successfully building and pushing the Docker image, Jenkins deploys the application by creating a Docker container.
+
+Command:
+
+```bash
+docker run -d --name zomato-app -p 3000:3000 pray12/zomato-app:latest
+```
+
+This starts the application and makes it accessible through port 3000.
+
+---
+
+# Q86. Why use docker run?
+
+## Answer
+
+`docker run` creates and starts a new container from a Docker image.
+
+Without this command, the image would exist but the application would not be running.
+
+---
+
+# Q87. What happens when docker run executes?
+
+## Answer
+
+Docker performs the following steps:
+
+1. Finds the Docker image.
+2. Creates a writable container layer.
+3. Allocates networking.
+4. Maps ports.
+5. Starts the application using the CMD instruction.
+
+---
+
+# Q88. How is port mapping done?
+
+## Answer
+
+Port mapping is configured using:
+
+```bash
+-p 3000:3000
+```
+
+The first port is the **host port**, and the second is the **container port**.
+
+This allows users to access the application from outside the container.
+
+---
+
+# Q89. Why specify a container name?
+
+## Answer
+
+Using:
+
+```bash
+--name zomato-app
+```
+
+assigns a meaningful name to the container.
+
+This makes management easier compared to using automatically generated container IDs.
+
+---
+
+# 12. Email Notification Interview Questions & Answers (Q90–Q93)
+
+---
+
+# Q90. Why send email in the post block?
+
+## Answer
+
+The `post` block executes after the pipeline finishes, regardless of success or failure.
+
+This ensures the team always receives the build result.
+
+---
+
+# Q91. What information do you send?
+
+## Answer
+
+The email contains:
+
+- Project Name
+- Build Status
+- Build Number
+- Jenkins Build URL
+- Trivy Report (attachment)
+
+This helps developers quickly understand the pipeline outcome.
+
+---
+
+# Q92. Why attach the Trivy report?
+
+## Answer
+
+The Trivy report provides detailed information about detected vulnerabilities.
+
+Attaching it allows developers to review and fix issues without logging into Jenkins.
+
+---
+
+# Q93. Why was the email not coming?
+
+## Answer
+
+In my project, the email was not sent because the **Email Extension Plugin (Email-ext)** was not fully configured.
+
+I verified:
+
+- SMTP server settings
+- Sender email
+- Authentication
+- App Password (for Gmail)
+- Test email configuration
+
+After correcting the SMTP configuration and credentials, Jenkins successfully sent the notification emails.
+# Part 13: Jenkins CI Pipeline Troubleshooting (Q94–Q100)
+
+---
+
+# Q94. Docker permission denied while building the image. How did you fix it?
+
+### Answer
+
+While building the Docker image in Jenkins, the pipeline failed with the following error:
+
+```text
+permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock
+```
+
+This happened because Jenkins was running as the **jenkins** user, but that user did not have permission to access the Docker daemon.
+
+### How I Troubleshot It
+
+1. Read the Jenkins Console Output.
+2. Noticed the error was related to `/var/run/docker.sock`.
+3. Verified the Docker socket permissions.
+
+```bash
+ls -l /var/run/docker.sock
+```
+
+Output:
+
+```bash
+srw-rw---- root docker
+```
+
+Only the **root** user and members of the **docker** group could access Docker.
+
+Next, I checked which groups Jenkins belonged to.
+
+```bash
+groups jenkins
+```
+
+Output:
+
+```bash
+jenkins : jenkins
+```
+
+The Jenkins user was **not** part of the docker group.
+
+### Fix
+
+Added Jenkins to the Docker group.
+
+```bash
+sudo usermod -aG docker jenkins
+```
+
+Restarted Jenkins.
+
+```bash
+sudo systemctl restart jenkins
+```
+
+Verified the group membership.
+
+```bash
+groups jenkins
+```
+
+Output:
+
+```bash
+jenkins : jenkins docker
+```
+
+After restarting Jenkins, the Docker build completed successfully.
+
+### Interview Tip
+
+Whenever you see **permission denied** while accessing Docker from Jenkins, first check whether the Jenkins user belongs to the Docker group.
+
+---
+
+# Q95. SonarQube Quality Gate got stuck forever. How did you fix it?
+
+### Answer
+
+After SonarQube analysis completed successfully, Jenkins remained stuck at:
+
+```text
+Checking status of SonarQube task...
+Status: IN_PROGRESS
+```
+
+The pipeline never moved to the next stage.
+
+### Root Cause
+
+The SonarQube **Webhook** was not configured.
+
+Jenkins waits for SonarQube to send the Quality Gate result through a webhook. Without it, Jenkins keeps waiting indefinitely.
+
+### How I Troubleshot It
+
+- Verified Sonar analysis completed successfully.
+- Opened SonarQube dashboard.
+- Checked Jenkins console logs.
+- Realized the task remained in **IN_PROGRESS**.
+
+### Fix
+
+Configured the webhook in SonarQube.
+
+Navigate to:
+
+```
+Administration
+→ Configuration
+→ Webhooks
+```
+
+Webhook URL:
+
+```text
+http://<jenkins-ip>:8080/sonarqube-webhook/
+```
+
+Example:
+
+```text
+http://13.xxx.xxx.xxx:8080/sonarqube-webhook/
+```
+
+Saved the webhook and reran the pipeline.
+
+The Quality Gate immediately changed from:
+
+```
+IN_PROGRESS
+```
+
+to
+
+```
+SUCCESS
+```
+
+and the pipeline continued.
+
+### Interview Tip
+
+If the Quality Gate waits forever, the first thing to check is whether the SonarQube webhook is configured correctly.
+
+---
+
+# Q96. Git Checkout failed. How did you fix it?
+
+### Answer
+
+Initially, Jenkins failed during the Git Checkout stage with the error:
+
+```text
+Couldn't find any revision to build.
+Verify the repository and branch configuration.
+```
+
+### Root Cause
+
+Jenkins was trying to checkout the **main** branch, but my GitHub repository actually used the **master** branch.
+
+### How I Troubleshot It
+
+Checked the repository branches.
+
+```bash
+git branch -a
+```
+
+Verified on GitHub that the repository contained:
+
+```
+master
+```
+
+instead of
+
+```
+main
+```
+
+### Fix
+
+Updated the Jenkins pipeline to checkout the correct branch.
+
+Example:
+
+```groovy
+git branch: 'master',
+    url: 'https://github.com/...'
+```
+
+After correcting the branch name, the Git Checkout stage succeeded.
+
+### Interview Tip
+
+Whenever Git Checkout fails, verify:
+
+- Repository URL
+- Branch name
+- Git credentials (if private repository)
+
+---
+
+# Q97. OWASP Dependency Check took nearly 30 minutes. Why?
+
+### Answer
+
+The first execution of OWASP Dependency Check took almost 30 minutes.
+
+### Root Cause
+
+During the first run, OWASP downloads the complete **NVD (National Vulnerability Database)**.
+
+The database contains hundreds of thousands of CVE records.
+
+Example from the logs:
+
+```text
+Downloaded 10,000 / 370,000
+Downloaded 20,000 / 370,000
+...
+```
+
+Since I had **not configured an NVD API Key**, OWASP was rate-limited by the NVD servers, making the download even slower.
+
+### Why Later Runs Were Faster
+
+OWASP stores the downloaded database locally.
+
+Future scans only download incremental updates instead of the entire database.
+
+### How to Improve Performance
+
+Generate a free NVD API Key and configure it in OWASP Dependency Check.
+
+This significantly reduces update time.
+
+### Interview Tip
+
+The first scan is always the slowest because the vulnerability database must be downloaded.
+
+---
+
+# Q98. Docker Scout command was not found. How did you fix it?
+
+### Answer
+
+During the Docker Scout stage, Jenkins failed with:
+
+```text
+docker: unknown command: scout
+```
+
+### Root Cause
+
+Docker Scout was installed only for the **root** user.
+
+Jenkins runs as the **jenkins** user.
+
+Although Docker itself was installed, the Docker Scout CLI plugin was not available in Jenkins' execution environment.
+
+### How I Troubleshot It
+
+Verified Scout worked as root.
+
+```bash
+docker scout version
+```
+
+It returned the installed version successfully.
+
+Then switched to the Jenkins user.
+
+```bash
+sudo su - jenkins
+```
+
+Executed:
+
+```bash
+docker scout version
+```
+
+The command failed.
+
+This confirmed Jenkins could not access Docker Scout.
+
+### Fix
+
+Installed Docker Scout so it was available system-wide (or ensured the Jenkins user's PATH included the Scout plugin), then restarted Jenkins.
+
+After that, the pipeline successfully executed:
+
+```bash
+docker scout quickview
+docker scout cves
+docker scout recommendations
+```
+
+### Interview Tip
+
+Always verify tools both as **root** and as the **jenkins** user. A tool working for root doesn't guarantee Jenkins can use it.
+
+---
+
+# Q99. Jenkins could not connect to SonarQube. How would you troubleshoot it?
+
+### Answer
+
+If Jenkins cannot connect to SonarQube, I follow a structured troubleshooting process.
+
+### Step 1 — Verify the container is running
+
+```bash
+docker ps
+```
+
+Ensure the SonarQube container is listed.
+
+---
+
+### Step 2 — Check SonarQube logs
+
+```bash
+docker logs sonarqube
+```
+
+or
+
+```bash
+docker logs <container-id>
+```
+
+Look for startup failures or database connection errors.
+
+---
+
+### Step 3 — Verify port accessibility
+
+```bash
+curl http://<server-ip>:9000
+```
+
+or open:
+
+```
+http://<server-ip>:9000
+```
+
+If unreachable, verify:
+
+- Security Group
+- Firewall
+- Docker port mapping
+
+---
+
+### Step 4 — Verify Jenkins Configuration
+
+Navigate to:
+
+```
+Manage Jenkins
+→ System
+→ SonarQube Servers
+```
+
+Check:
+
+- Server URL
+- Authentication Token
+- Server Name
+
+---
+
+### Step 5 — Test Connectivity
+
+From the Jenkins server:
+
+```bash
+ping <sonarqube-ip>
+```
+
+or
+
+```bash
+curl http://<sonarqube-ip>:9000
+```
+
+---
+
+### Interview Tip
+
+Never assume SonarQube is down. Always verify:
+
+- Container
+- Network
+- Port
+- Jenkins configuration
+- Authentication
+
+before making changes.
+
+---
+
+# Q100. Your Jenkins pipeline worked yesterday but suddenly fails today. What is your troubleshooting approach?
+
+### Answer
+
+I follow a systematic approach instead of guessing.
+
+### Step 1 — Read the Console Output
+
+The Jenkins Console Output usually indicates the exact stage where the failure occurred.
+
+Examples:
+
+- Git Checkout
+- SonarQube
+- Docker Build
+- Docker Push
+
+---
+
+### Step 2 — Identify the Failed Stage
+
+Determine whether the issue is:
+
+- Source Code
+- Jenkins Configuration
+- Infrastructure
+- External Service
+
+---
+
+### Step 3 — Check Jenkins Logs
+
+If the Console Output is unclear, inspect Jenkins logs.
+
+```bash
+sudo journalctl -u jenkins
+```
+
+or
+
+```bash
+sudo systemctl status jenkins
+```
+
+---
+
+### Step 4 — Verify External Services
+
+Check whether the dependent services are available.
+
+Examples:
+
+- GitHub
+- SonarQube
+- DockerHub
+- Internet Connectivity
+
+---
+
+### Step 5 — Verify Credentials
+
+Ensure credentials are still valid.
+
+Examples:
+
+- DockerHub Credentials
+- SonarQube Token
+- GitHub Token
+
+---
+
+### Step 6 — Verify Network Connectivity
+
+Check connectivity from Jenkins.
+
+```bash
+ping github.com
+
+curl http://<sonarqube-ip>:9000
+```
+
+---
+
+### Step 7 — Fix the Root Cause
+
+Avoid rerunning the pipeline without understanding the issue.
+
+Resolve the actual problem first.
+
+---
+
+### Step 8 — Rebuild the Pipeline
+
+Once the issue is fixed:
+
+```
+Build Now
+```
+
+Verify that all stages complete successfully.
+
+---
+
+## Interview Tip
+
+A DevOps engineer should troubleshoot methodically.
+
+Instead of guessing, I follow this order:
+
+1. Read Console Output
+2. Identify the Failed Stage
+3. Check Logs
+4. Verify External Services
+5. Verify Credentials
+6. Check Network Connectivity
+7. Fix the Root Cause
+8. Rerun the Pipeline
+
+This approach minimizes downtime and quickly identifies the real issue.
+
+# Part 14: Scenario-Based Interview Questions (CI Pipeline)
+
+---
+
+# Q101. A developer commits broken code. How does your pipeline prevent deployment?
+
+## Answer
+
+My pipeline has multiple validation stages before deployment.
+
+The flow is:
+
+```
+GitHub
+   ↓
+Jenkins
+   ↓
+SonarQube Analysis
+   ↓
+Quality Gate
+   ↓
+npm install
+   ↓
+OWASP Dependency Check
+   ↓
+Trivy Scan
+   ↓
+Docker Build
+   ↓
+DockerHub
+   ↓
+Deployment
+```
+
+If the code contains quality issues or security vulnerabilities:
+
+- SonarQube can fail the Quality Gate.
+- OWASP can detect vulnerable dependencies.
+- Trivy can detect Critical vulnerabilities.
+
+If any of these stages fail, Jenkins stops the pipeline and the deployment stage is never executed.
+
+This prevents broken or insecure code from reaching production.
+
+---
+
+# Q102. SonarQube is down. Should the pipeline continue?
+
+## Answer
+
+It depends on the environment.
+
+### Development
+
+The pipeline can continue temporarily if code quality checks are not critical.
+
+### Production
+
+No.
+
+I would stop the pipeline because deploying code without static analysis increases the risk of introducing bugs or security vulnerabilities.
+
+First I would:
+
+- Check whether the SonarQube container is running.
+- Review the logs.
+- Restore SonarQube.
+- Re-run the pipeline.
+
+---
+
+# Q103. DockerHub is unavailable. What would you do?
+
+## Answer
+
+If DockerHub is unavailable:
+
+- Build the Docker image successfully.
+- Keep the image locally.
+- Retry the push later.
+
+For production, I would use a private container registry such as:
+
+- Amazon ECR
+- Azure Container Registry
+- Google Artifact Registry
+- Harbor
+
+These registries provide higher availability and better security.
+
+---
+
+# Q104. The Docker image has Critical CVEs. Would you still deploy?
+
+## Answer
+
+No.
+
+I would stop the deployment.
+
+Next I would:
+
+1. Review the vulnerability report.
+2. Identify the vulnerable package.
+3. Upgrade the package or base image.
+4. Rebuild the Docker image.
+5. Run the security scans again.
+6. Deploy only after the image is secure.
+
+Deploying an image with Critical vulnerabilities can expose the application to attacks.
+
+---
+
+# Q105. GitHub Webhook isn't triggering. How would you troubleshoot?
+
+## Answer
+
+I would troubleshoot in this order:
+
+1. Verify the webhook exists in GitHub.
+2. Check whether the webhook URL is correct.
+3. Ensure Jenkins is reachable.
+4. Review webhook delivery logs in GitHub.
+5. Confirm "GitHub hook trigger for GITScm polling" is enabled.
+6. Check Jenkins system logs.
+7. Trigger the webhook manually.
+8. Verify firewall and security group rules.
+
+---
+
+# Q106. npm install suddenly starts failing. What checks would you perform?
+
+## Answer
+
+I would check:
+
+- package.json
+- package-lock.json
+- Internet connectivity
+- npm registry availability
+- NodeJS version compatibility
+- Disk space
+- Permission issues
+- Error logs
+
+Common reasons include:
+
+- Incorrect dependency versions
+- Network failures
+- Unsupported Node version
+- Corrupted npm cache
+
+---
+
+# Q107. The build succeeds but the application doesn't start inside the container. How would you debug it?
+
+## Answer
+
+First, verify the container status.
+
+```bash
+docker ps -a
+```
+
+View container logs.
+
+```bash
+docker logs <container-id>
+```
+
+Access the container.
+
+```bash
+docker exec -it <container-id> sh
+```
+
+Verify:
+
+- Node application started
+- Port configuration
+- Environment variables
+- npm dependencies
+- Application errors
+
+This usually identifies the root cause quickly.
+
+---
+
+# Q108. The container exits immediately after docker run. What commands would you use?
+
+## Answer
+
+I would execute:
+
+View exited containers.
+
+```bash
+docker ps -a
+```
+
+Check logs.
+
+```bash
+docker logs <container-id>
+```
+
+Inspect container configuration.
+
+```bash
+docker inspect <container-id>
+```
+
+Run interactively.
+
+```bash
+docker run -it image-name sh
+```
+
+These commands help determine whether the issue is related to the application, Dockerfile, or startup command.
+
+---
+
+# Q109. Jenkins server crashes during a build. How would you recover?
+
+## Answer
+
+I would follow these steps:
+
+1. Restart Jenkins.
+
+```bash
+sudo systemctl restart jenkins
+```
+
+2. Verify Jenkins status.
+
+```bash
+sudo systemctl status jenkins
+```
+
+3. Review Jenkins logs.
+
+```bash
+journalctl -u jenkins
+```
+
+4. Check available disk space.
+
+```bash
+df -h
+```
+
+5. Check memory usage.
+
+```bash
+free -h
+```
+
+6. Rebuild the failed pipeline.
+
+If the server repeatedly crashes, I would investigate CPU, memory, plugins, and system logs.
+
+---
+
+# Q110. Multiple developers push code simultaneously. How does Jenkins handle concurrent builds?
+
+## Answer
+
+Jenkins creates separate build jobs.
+
+Each build gets:
+
+- Its own workspace
+- Build number
+- Console logs
+
+Depending on the configuration:
+
+- Builds can run in parallel.
+- Builds can wait in a queue.
+- Builds can cancel previous running builds.
+
+Jenkins manages concurrent execution automatically.
+
+---
+
+# Q111. How would you reduce your pipeline execution time?
+
+## Answer
+
+I would improve performance by:
+
+- Using Docker layer caching.
+- Caching npm dependencies.
+- Using an NVD API key for OWASP.
+- Running independent stages in parallel.
+- Skipping unnecessary scans.
+- Cleaning only required files.
+- Using lightweight Docker images.
+- Using incremental builds whenever possible.
+
+These optimizations reduce build time significantly.
+
+---
+
+# Q112. How would you make this pipeline production-ready?
+
+## Answer
+
+For production I would add:
+
+- Private Docker Registry (Amazon ECR)
+- Kubernetes deployment
+- ArgoCD GitOps
+- Helm charts
+- Automated testing
+- Rollback strategy
+- Slack notifications
+- Monitoring (Prometheus & Grafana)
+- Secrets Manager
+- HTTPS using Load Balancer
+- Multi-stage Docker builds
+- Backup strategy
+- Infrastructure as Code using Terraform
+
+This makes the pipeline more secure, scalable, and maintainable.
+
+---
+
+# Q113. How would you migrate this Docker deployment to Kubernetes?
+
+## Answer
+
+Instead of:
+
+```bash
+docker run
+```
+
+I would create Kubernetes manifests:
+
+- Deployment
+- Service
+- ConfigMap
+- Secret
+- Ingress
+
+The deployment process becomes:
+
+```
+GitHub
+↓
+
+Jenkins
+
+↓
+
+Docker Image
+
+↓
+
+DockerHub
+
+↓
+
+Kubernetes Deployment
+
+↓
+
+Pods Created
+
+↓
+
+Application Available
+```
+
+This provides better scalability, self-healing, and rolling updates.
+
+---
+
+# Q114. If DockerHub is compromised, what alternatives could you use?
+
+## Answer
+
+Alternatives include:
+
+- Amazon Elastic Container Registry (ECR)
+- Azure Container Registry (ACR)
+- Google Artifact Registry
+- Harbor
+- GitHub Container Registry (GHCR)
+
+For AWS environments, I would prefer Amazon ECR because it integrates well with IAM and EKS.
+
+---
+
+# Q115. How would you add automated testing before deployment?
+
+## Answer
+
+I would insert a testing stage before building the Docker image.
+
+Example pipeline:
+
+```
+Git Checkout
+↓
+
+npm install
+
+↓
+
+Unit Tests
+
+↓
+
+Integration Tests
+
+↓
+
+SonarQube
+
+↓
+
+OWASP
+
+↓
+
+Trivy
+
+↓
+
+Docker Build
+
+↓
+
+Deploy
+```
+
+If any tests fail, Jenkins stops the pipeline automatically.
+
+---
+
+# Q116. SonarQube reports 500 Code Smells. What would your next steps be?
+
+## Answer
+
+I would not ignore them.
+
+Instead I would:
+
+1. Review the SonarQube report.
+2. Prioritize High Severity issues.
+3. Assign issues to developers.
+4. Refactor the affected code.
+5. Re-run SonarQube.
+6. Verify the Quality Gate passes.
+
+Not every Code Smell is critical, but reducing them improves code maintainability.
+
+---
+
+# Q117. How would you implement rollback if a deployment fails?
+
+## Answer
+
+A rollback allows us to return to the last working version.
+
+For Docker deployments, I would:
+
+1. Tag every image with a version.
+
+Example:
+
+```text
+pray12/zomato-app:v1
+pray12/zomato-app:v2
+pray12/zomato-app:v3
+```
+
+2. If deployment fails:
+
+```bash
+docker stop zomato-app
+docker rm zomato-app
+```
+
+3. Start the previous stable version.
+
+```bash
+docker run -d \
+--name zomato-app \
+-p 3000:3000 \
+pray12/zomato-app:v2
+```
+
+In Kubernetes, rollback is much easier:
+
+```bash
+kubectl rollout undo deployment/zomato-app
+```
+
+This immediately restores the previous stable version with minimal downtime.
+
