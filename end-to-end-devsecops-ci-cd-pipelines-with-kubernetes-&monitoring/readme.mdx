@@ -407,29 +407,88 @@ sudo vi /etc/systemd/system/prometheus.service
 Add the following content to the prometheus.service file:
 
 ```bash
-[Unit]
+# The Unit section defines service dependencies, ensuring Prometheus starts only after the network is available.
+[Unit] 
+
+# What: A short description of the service.
+# Why: Helps identify the service when using systemctl status.
 Description=Prometheus
+
+# What: Indicates this service requires the network to be online.
+# Why: Prometheus needs network connectivity to scrape metrics from targets.
 Wants=network-online.target
+
+# What: Starts Prometheus only after the network is available.
+# Why: Prevents Prometheus from starting before networking is ready.
 After=network-online.target
 
+# What: Defines the time window (500 seconds) for restart attempts.
+# Why: Prevents endless restart loops if the service repeatedly crashes.
 StartLimitIntervalSec=500
+
+# What: Allows only 5 restart attempts within the above interval.
+# Why: Stops systemd from continuously restarting a failing service.
 StartLimitBurst=5
 
-[Service]
+#The Service section specifies how Prometheus should run—using a dedicated non-root user for security, automatically restarting on failure, and executing the Prometheus binary with the configuration file, storage path, web console directories, and listening on port 9090.
+[Service] 
+
+# What: Runs Prometheus as the 'prometheus' Linux user.
+# Why: Improves security by avoiding running the service as root.
 User=prometheus
+
+# What: Runs the service under the 'prometheus' group.
+# Why: Controls file permissions and resource access securely.
 Group=prometheus
+
+# What: Specifies that Prometheus is a long-running foreground process.
+# Why: systemd knows it doesn't need to wait for child processes.
 Type=simple
+
+# What: Automatically restart the service if it crashes.
+# Why: Keeps monitoring available without manual intervention.
 Restart=on-failure
+
+# What: Waits 5 seconds before restarting.
+# Why: Prevents rapid restart loops that consume CPU resources.
 RestartSec=5s
+
+# What: Starts the Prometheus executable.
+# Why: This is the actual command used to launch Prometheus.
 ExecStart=/usr/local/bin/prometheus \
+
+  # What: Specifies the Prometheus configuration file.
+  # Why: Defines scrape jobs, targets, and global settings.
   --config.file=/etc/prometheus/prometheus.yml \
+
+  # What: Location where Prometheus stores time-series data.
+  # Why: All collected metrics are saved here for querying and visualization.
   --storage.tsdb.path=/data \
+
+  # What: Path to HTML console templates.
+  # Why: Used by Prometheus built-in web console pages.
   --web.console.templates=/etc/prometheus/consoles \
+
+  # What: Path to console libraries.
+  # Why: Required for rendering built-in console templates.
   --web.console.libraries=/etc/prometheus/console_libraries \
+
+  # What: Makes Prometheus listen on all network interfaces at port 9090.
+  # Why: Allows remote access from browsers and Grafana.
   --web.listen-address=0.0.0.0:9090 \
+
+  # What: Enables the Prometheus lifecycle API.
+  # Why: Allows configuration reloads without restarting the service.
+  # Example:
+  # curl -X POST http://localhost:9090/-/reload
   --web.enable-lifecycle
 
+# the Install section ensures Prometheus starts automatically whenever the server boots.
+
 [Install]
+
+# What: Starts Prometheus automatically when the system reaches multi-user mode.
+# Why: Ensures Prometheus starts automatically after every server reboot.
 WantedBy=multi-user.target
 ```
 
