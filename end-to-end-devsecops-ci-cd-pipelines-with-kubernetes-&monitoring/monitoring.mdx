@@ -1,0 +1,540 @@
+# Prometheus Interview Questions & Answers
+> Based on the Monitoring Phase of the CI/CD + Monitoring Project
+
+---
+
+# Q1. What is Prometheus?
+
+### Answer
+
+Prometheus is an open-source monitoring and alerting tool developed by SoundCloud and now maintained by CNCF. It collects metrics from applications and infrastructure at regular intervals, stores them as time-series data, and allows us to query them using PromQL.
+
+In my project, I used Prometheus to monitor the Jenkins server and the monitoring server through Node Exporter.
+
+---
+
+# Q2. Why did you choose Prometheus?
+
+### Answer
+
+I chose Prometheus because it is lightweight, open source, integrates well with Grafana, supports automatic metric collection, and is widely used in Kubernetes and cloud-native environments.
+
+It allows us to monitor CPU, memory, disk, network, and application metrics in real time.
+
+---
+
+# Q3. What is monitoring?
+
+### Answer
+
+Monitoring is the process of continuously collecting and analyzing system metrics to understand the health and performance of servers and applications.
+
+It helps detect issues early before they impact users.
+
+---
+
+# Q4. Why do we need monitoring?
+
+### Answer
+
+Without monitoring, we won't know if servers are overloaded, applications are slow, or services have stopped.
+
+Monitoring helps us:
+
+- Detect failures
+- Improve availability
+- Analyze performance
+- Troubleshoot problems
+- Plan infrastructure capacity
+
+---
+
+# Q5. What is a metric?
+
+### Answer
+
+A metric is a numerical value representing the current state of a system.
+
+Examples include:
+
+- CPU usage
+- Memory usage
+- Disk utilization
+- Number of HTTP requests
+- Build duration
+
+---
+
+# Q6. Explain your monitoring architecture.
+
+### Answer
+
+My monitoring setup consists of:
+
+- Monitoring EC2 instance
+- Prometheus
+- Node Exporter
+- Grafana
+- Jenkins Prometheus Plugin
+
+Architecture:
+
+```text
+Node Exporter
+      │
+      ▼
+Prometheus
+      │
+      ▼
+Grafana
+```
+
+Prometheus scrapes metrics from Node Exporter and Jenkins.
+
+Grafana reads metrics from Prometheus and displays them as dashboards.
+
+---
+
+# Q7. What is the role of Prometheus?
+
+### Answer
+
+Prometheus periodically collects metrics from configured targets, stores them in its database, and provides those metrics for visualization and alerting.
+
+---
+
+# Q8. What are Prometheus Targets?
+
+### Answer
+
+Targets are systems or applications from which Prometheus collects metrics.
+
+Examples:
+
+- Node Exporter
+- Jenkins
+- Kubernetes
+- Spring Boot applications
+
+---
+
+# Q9. What is scraping?
+
+### Answer
+
+Scraping is the process where Prometheus sends HTTP requests to configured targets and collects their metrics.
+
+By default, Prometheus scrapes targets every 15 seconds.
+
+---
+
+# Q10. How does Prometheus collect data?
+
+### Answer
+
+Prometheus sends HTTP requests to configured endpoints such as:
+
+```text
+http://server-ip:9100/metrics
+```
+
+The target returns metrics, which Prometheus stores as time-series data.
+
+---
+
+# Q11. What is Node Exporter?
+
+### Answer
+
+Node Exporter is a Prometheus exporter that exposes Linux system metrics.
+
+It collects:
+
+- CPU
+- RAM
+- Disk
+- Filesystem
+- Network
+- Load Average
+
+---
+
+# Q12. Why did you install Node Exporter?
+
+### Answer
+
+Prometheus cannot directly understand Linux system metrics.
+
+Node Exporter exposes those metrics in Prometheus format so Prometheus can scrape and store them.
+
+---
+
+# Q13. Which port does Node Exporter use?
+
+### Answer
+
+Node Exporter listens on port **9100**.
+
+Example:
+
+```text
+http://server-ip:9100/metrics
+```
+
+---
+
+# Q14. Which metrics does Node Exporter provide?
+
+### Answer
+
+Examples include:
+
+- CPU usage
+- Memory usage
+- Disk usage
+- Filesystem usage
+- Network traffic
+- Boot time
+- Load average
+
+---
+
+# Q15. What is prometheus.yml?
+
+### Answer
+
+`prometheus.yml` is the main configuration file of Prometheus.
+
+It defines:
+
+- Scrape interval
+- Jobs
+- Targets
+- Alert rules
+
+---
+
+# Q16. What is a job in Prometheus?
+
+### Answer
+
+A job groups one or more targets.
+
+Example:
+
+```yaml
+job_name: node_exporter
+```
+
+This job tells Prometheus to scrape all configured Node Exporter targets.
+
+---
+
+# Q17. Explain this configuration.
+
+```yaml
+job_name: node_exporter
+static_configs:
+  - targets:
+      - 172.31.8.44:9100
+```
+
+### Answer
+
+This configuration tells Prometheus to:
+
+- Create a job named **node_exporter**
+- Connect to **172.31.8.44**
+- Collect metrics from port **9100**
+
+---
+
+# Q18. Why did you reload Prometheus instead of restarting it?
+
+### Answer
+
+Reloading applies configuration changes without stopping the service.
+
+Command:
+
+```bash
+curl -X POST http://localhost:9090/-/reload
+```
+
+This avoids downtime while updating the configuration.
+
+---
+
+# Q19. How did Prometheus monitor Jenkins?
+
+### Answer
+
+I installed the **Prometheus Metrics Plugin** in Jenkins.
+
+The plugin exposes Jenkins metrics at:
+
+```text
+http://jenkins-ip:8080/prometheus
+```
+
+Prometheus scrapes this endpoint and stores the metrics.
+
+---
+
+# Q20. What Jenkins metrics were collected?
+
+### Answer
+
+Some Jenkins metrics include:
+
+- Build count
+- Build duration
+- Queue size
+- Executor usage
+- Job status
+
+---
+
+# Q21. Why create a dedicated Prometheus user?
+
+### Answer
+
+For security.
+
+Running Prometheus as root is not recommended.
+
+A dedicated system user limits permissions and follows the Principle of Least Privilege.
+
+---
+
+# Q22. Why use systemd?
+
+### Answer
+
+systemd allows Prometheus to:
+
+- Start automatically after reboot
+- Restart automatically on failure
+- Be managed using `systemctl`
+- Store logs centrally
+
+---
+
+# Q23. What does `Restart=on-failure` mean?
+
+### Answer
+
+If Prometheus crashes unexpectedly, systemd automatically restarts the service.
+
+This improves reliability.
+
+---
+
+# Q24. Why is Prometheus listening on port 9090?
+
+### Answer
+
+9090 is the default Prometheus web interface.
+
+It allows users to access Prometheus using:
+
+```text
+http://server-ip:9090
+```
+
+---
+
+# Q25. Prometheus service isn't starting. How would you troubleshoot?
+
+### Answer
+
+I would:
+
+1. Check service status.
+
+```bash
+sudo systemctl status prometheus
+```
+
+2. Check logs.
+
+```bash
+journalctl -u prometheus
+```
+
+3. Validate the configuration.
+
+```bash
+promtool check config /etc/prometheus/prometheus.yml
+```
+
+4. Verify permissions and binary paths.
+
+---
+
+# Q26. A target shows DOWN. What will you check?
+
+### Answer
+
+I would verify:
+
+- Node Exporter service is running
+- Port 9100 is open
+- Security Group allows traffic
+- Firewall rules
+- Target IP is correct
+
+---
+
+# Q27. Prometheus shows "Connection Refused". What could be the reason?
+
+### Answer
+
+Possible causes:
+
+- Node Exporter stopped
+- Wrong port
+- Firewall blocking traffic
+- Incorrect target IP
+- Service not running
+
+---
+
+# Q28. Prometheus configuration is invalid. How would you check?
+
+### Answer
+
+I would validate the configuration using:
+
+```bash
+promtool check config /etc/prometheus/prometheus.yml
+```
+
+If there are syntax errors, Prometheus will display them.
+
+---
+
+# Q29. Metrics are not updating. What would you check?
+
+### Answer
+
+I would verify:
+
+- Target status
+- Scrape interval
+- Exporter health
+- Network connectivity
+- Prometheus configuration
+- Configuration reload status
+
+---
+
+# Q30. Why is Node Exporter showing DOWN?
+
+### Answer
+
+Possible reasons include:
+
+- Node Exporter service stopped
+- Wrong target IP
+- Port 9100 blocked
+- Firewall issue
+- Incorrect Prometheus configuration
+
+---
+
+# Scenario-Based Questions
+
+## Q31. A server suddenly reaches 100% CPU. How will Prometheus help?
+
+### Answer
+
+Prometheus continuously collects CPU usage metrics. Grafana dashboards will show the spike, and if Alertmanager is configured, notifications can be sent immediately to the operations team.
+
+---
+
+## Q32. Prometheus is running, but Grafana dashboards show no data. What will you check?
+
+### Answer
+
+I would check:
+
+- Prometheus service is running
+- Targets are UP
+- Grafana data source configuration
+- Dashboard queries
+- Network connectivity
+
+---
+
+## Q33. How would you monitor multiple servers?
+
+### Answer
+
+Install Node Exporter on each server and add each server as a target in `prometheus.yml`.
+
+Prometheus will scrape metrics from all configured targets.
+
+---
+
+## Q34. How would you make this monitoring setup production-ready?
+
+### Answer
+
+I would:
+
+- Configure Alertmanager
+- Enable HTTPS
+- Add authentication
+- Use service discovery
+- Configure retention policies
+- Enable persistent storage
+- Back up Grafana dashboards
+- Deploy Prometheus in a highly available architecture
+
+---
+
+# Interview Summary
+
+### Technologies Used
+
+- Prometheus
+- Node Exporter
+- Grafana
+- Jenkins Prometheus Metrics Plugin
+
+### Ports Used
+
+| Service | Port |
+|----------|------|
+| Prometheus | 9090 |
+| Grafana | 3000 |
+| Node Exporter | 9100 |
+| Jenkins | 8080 |
+
+### Important Commands
+
+```bash
+sudo systemctl status prometheus
+
+sudo systemctl restart prometheus
+
+promtool check config /etc/prometheus/prometheus.yml
+
+curl -X POST http://localhost:9090/-/reload
+```
+
+### Project Flow
+
+```text
+Linux Server
+      │
+      ▼
+Node Exporter
+      │
+      ▼
+Prometheus
+      │
+      ▼
+Grafana Dashboard
+```
