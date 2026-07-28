@@ -1,540 +1,201 @@
-# Prometheus Interview Questions & Answers
-> Based on the Monitoring Phase of the CI/CD + Monitoring Project
+---
+title: "Monitoring Stack Interview Q&A (Prometheus, Node Exporter, Jenkins, Grafana)"
+level: "1-2 Years DevOps Engineer"
+---
+
+# Monitoring Setup — Interview Questions & Answers
+
+Based on a Prometheus + Node Exporter + Jenkins + Grafana monitoring setup. Covers concepts, configuration, and troubleshooting/scenario-based questions.
 
 ---
 
-# Q1. What is Prometheus?
+## Section A: Conceptual / Fundamentals
 
-### Answer
+### 1. What is Prometheus and why is it used?
+Prometheus is an open-source monitoring and alerting toolkit that collects metrics from configured targets by "scraping" HTTP endpoints at regular intervals. It stores data as time-series and provides a query language (PromQL) to analyze it. It's used because it's pull-based, has a simple text exposition format, integrates natively with tools like Grafana, and has strong support for service discovery in cloud/container environments.
 
-Prometheus is an open-source monitoring and alerting tool developed by SoundCloud and now maintained by CNCF. It collects metrics from applications and infrastructure at regular intervals, stores them as time-series data, and allows us to query them using PromQL.
+### 2. What is the difference between push-based and pull-based monitoring?
+In push-based monitoring, the application/agent sends metrics to a central server (e.g., StatsD, Graphite). In pull-based monitoring, the server (Prometheus) scrapes metrics from targets on a schedule. Prometheus is pull-based, which gives it centralized control over scrape intervals and makes it easier to detect if a target is down (since a failed scrape is directly visible).
 
-In my project, I used Prometheus to monitor the Jenkins server and the monitoring server through Node Exporter.
+### 3. What is Node Exporter?
+Node Exporter is a Prometheus exporter that exposes hardware and OS-level metrics (CPU, memory, disk, network, filesystem) of a Linux/Unix machine on port `9100` by default, in a format Prometheus can scrape.
 
----
+### 4. Why do we create a dedicated system user (`prometheus`, `node_exporter`) instead of running these as root?
+Running services as a non-root, no-login system user follows the principle of least privilege. If the service is compromised or has a vulnerability, the blast radius is limited since the user has no shell access (`--shell /bin/false`) and no home directory (`--no-create-home`).
 
-# Q2. Why did you choose Prometheus?
+### 5. What is the purpose of `promtool`?
+`promtool` is a CLI utility bundled with Prometheus used to validate configuration files (`promtool check config`), check rule files, and debug/query data. It's commonly used in CI pipelines to catch config errors before deploying.
 
-### Answer
+### 6. What does `--web.enable-lifecycle` do, and why is it useful?
+It enables the `/-/reload` and `/-/quit` HTTP endpoints on Prometheus. This lets you reload configuration changes (like new scrape jobs) via `curl -X POST http://localhost:9090/-/reload` without restarting the whole service — avoiding any gap in metrics collection.
 
-I chose Prometheus because it is lightweight, open source, integrates well with Grafana, supports automatic metric collection, and is widely used in Kubernetes and cloud-native environments.
+### 7. What is a "target" in Prometheus, and how do you verify target health?
+A target is an endpoint Prometheus scrapes for metrics (defined under `static_configs` in a job). You verify health via the Prometheus UI: **Status → Targets**, which shows each target's state (`UP`/`DOWN`), last scrape time, and error message if any.
 
-It allows us to monitor CPU, memory, disk, network, and application metrics in real time.
+### 8. What's the role of `storage.tsdb.path` in the Prometheus service file?
+It defines where Prometheus stores its time-series database on disk (in this setup, `/data`). This directory must be owned by the `prometheus` user, and its size grows over time based on retention settings and scrape frequency — so disk space monitoring here is important.
 
----
+### 9. What is Grafana's role in this stack, and why not just use Prometheus's built-in UI?
+Grafana is a visualization layer that connects to Prometheus (and other data sources) to build dashboards, alerts, and panels. Prometheus's built-in expression browser is functional but very basic — Grafana provides templated dashboards, better graphing, alerting rules, and multi-source correlation.
 
-# Q3. What is monitoring?
-
-### Answer
-
-Monitoring is the process of continuously collecting and analyzing system metrics to understand the health and performance of servers and applications.
-
-It helps detect issues early before they impact users.
-
----
-
-# Q4. Why do we need monitoring?
-
-### Answer
-
-Without monitoring, we won't know if servers are overloaded, applications are slow, or services have stopped.
-
-Monitoring helps us:
-
-- Detect failures
-- Improve availability
-- Analyze performance
-- Troubleshoot problems
-- Plan infrastructure capacity
+### 10. Why did we need to add the Prometheus data source URL in Grafana, and why remove the trailing `/`?
+Grafana needs to know where to query Prometheus's HTTP API. A trailing slash can cause the constructed API URL to have a double-slash (`//api/v1/query`), which some HTTP servers/proxies mishandle, leading to failed "Save & Test" connectivity checks.
 
 ---
 
-# Q5. What is a metric?
+## Section B: systemd & Service Configuration
 
-### Answer
+### 11. Explain `StartLimitIntervalSec` and `StartLimitBurst` in the systemd unit file.
+Together they define restart-flood protection: `StartLimitBurst=5` allows a maximum of 5 restarts within `StartLimitIntervalSec=500` seconds. If the service crashes more than 5 times in that window, systemd stops trying to restart it, preventing a crash-loop from consuming CPU/resources indefinitely.
 
-A metric is a numerical value representing the current state of a system.
+### 12. What's the difference between `Restart=on-failure` and `Restart=always`?
+`on-failure` restarts the service only if it exits with a non-zero code, is killed by a signal, or times out — not on a clean/expected stop. `Restart=always` restarts it under virtually any exit condition, including a clean exit. For monitoring agents, `on-failure` is usually preferred so intentional stops (e.g., during maintenance) aren't immediately reversed.
 
-Examples include:
+### 13. What does `Type=simple` mean in a systemd service?
+It tells systemd that the process started by `ExecStart` is the main process and it does not fork into the background. systemd considers the service "started" as soon as the process is launched.
 
-- CPU usage
-- Memory usage
-- Disk utilization
-- Number of HTTP requests
-- Build duration
+### 14. Why is `Wants=network-online.target` combined with `After=network-online.target` instead of just `After`?
+`After` only controls ordering (start after this target is reached), it doesn't guarantee the target is *actually pulled in*. `Wants` creates a weaker dependency that pulls in `network-online.target` if not already active. Using both ensures the network is both requested and the service waits for it, which matters for services (like Prometheus scraping) that need functioning network at startup.
 
----
-
-# Q6. Explain your monitoring architecture.
-
-### Answer
-
-My monitoring setup consists of:
-
-- Monitoring EC2 instance
-- Prometheus
-- Node Exporter
-- Grafana
-- Jenkins Prometheus Plugin
-
-Architecture:
-
-```text
-Node Exporter
-      │
-      ▼
-Prometheus
-      │
-      ▼
-Grafana
-```
-
-Prometheus scrapes metrics from Node Exporter and Jenkins.
-
-Grafana reads metrics from Prometheus and displays them as dashboards.
-
----
-
-# Q7. What is the role of Prometheus?
-
-### Answer
-
-Prometheus periodically collects metrics from configured targets, stores them in its database, and provides those metrics for visualization and alerting.
-
----
-
-# Q8. What are Prometheus Targets?
-
-### Answer
-
-Targets are systems or applications from which Prometheus collects metrics.
-
-Examples:
-
-- Node Exporter
-- Jenkins
-- Kubernetes
-- Spring Boot applications
-
----
-
-# Q9. What is scraping?
-
-### Answer
-
-Scraping is the process where Prometheus sends HTTP requests to configured targets and collects their metrics.
-
-By default, Prometheus scrapes targets every 15 seconds.
-
----
-
-# Q10. How does Prometheus collect data?
-
-### Answer
-
-Prometheus sends HTTP requests to configured endpoints such as:
-
-```text
-http://server-ip:9100/metrics
-```
-
-The target returns metrics, which Prometheus stores as time-series data.
-
----
-
-# Q11. What is Node Exporter?
-
-### Answer
-
-Node Exporter is a Prometheus exporter that exposes Linux system metrics.
-
-It collects:
-
-- CPU
-- RAM
-- Disk
-- Filesystem
-- Network
-- Load Average
-
----
-
-# Q12. Why did you install Node Exporter?
-
-### Answer
-
-Prometheus cannot directly understand Linux system metrics.
-
-Node Exporter exposes those metrics in Prometheus format so Prometheus can scrape and store them.
-
----
-
-# Q13. Which port does Node Exporter use?
-
-### Answer
-
-Node Exporter listens on port **9100**.
-
-Example:
-
-```text
-http://server-ip:9100/metrics
-```
-
----
-
-# Q14. Which metrics does Node Exporter provide?
-
-### Answer
-
-Examples include:
-
-- CPU usage
-- Memory usage
-- Disk usage
-- Filesystem usage
-- Network traffic
-- Boot time
-- Load average
-
----
-
-# Q15. What is prometheus.yml?
-
-### Answer
-
-`prometheus.yml` is the main configuration file of Prometheus.
-
-It defines:
-
-- Scrape interval
-- Jobs
-- Targets
-- Alert rules
-
----
-
-# Q16. What is a job in Prometheus?
-
-### Answer
-
-A job groups one or more targets.
-
-Example:
-
-```yaml
-job_name: node_exporter
-```
-
-This job tells Prometheus to scrape all configured Node Exporter targets.
-
----
-
-# Q17. Explain this configuration.
-
-```yaml
-job_name: node_exporter
-static_configs:
-  - targets:
-      - 172.31.8.44:9100
-```
-
-### Answer
-
-This configuration tells Prometheus to:
-
-- Create a job named **node_exporter**
-- Connect to **172.31.8.44**
-- Collect metrics from port **9100**
-
----
-
-# Q18. Why did you reload Prometheus instead of restarting it?
-
-### Answer
-
-Reloading applies configuration changes without stopping the service.
-
-Command:
-
+### 15. After editing a `.service` file, what commands must you run and why?
 ```bash
-curl -X POST http://localhost:9090/-/reload
-```
-
-This avoids downtime while updating the configuration.
-
----
-
-# Q19. How did Prometheus monitor Jenkins?
-
-### Answer
-
-I installed the **Prometheus Metrics Plugin** in Jenkins.
-
-The plugin exposes Jenkins metrics at:
-
-```text
-http://jenkins-ip:8080/prometheus
-```
-
-Prometheus scrapes this endpoint and stores the metrics.
-
----
-
-# Q20. What Jenkins metrics were collected?
-
-### Answer
-
-Some Jenkins metrics include:
-
-- Build count
-- Build duration
-- Queue size
-- Executor usage
-- Job status
-
----
-
-# Q21. Why create a dedicated Prometheus user?
-
-### Answer
-
-For security.
-
-Running Prometheus as root is not recommended.
-
-A dedicated system user limits permissions and follows the Principle of Least Privilege.
-
----
-
-# Q22. Why use systemd?
-
-### Answer
-
-systemd allows Prometheus to:
-
-- Start automatically after reboot
-- Restart automatically on failure
-- Be managed using `systemctl`
-- Store logs centrally
-
----
-
-# Q23. What does `Restart=on-failure` mean?
-
-### Answer
-
-If Prometheus crashes unexpectedly, systemd automatically restarts the service.
-
-This improves reliability.
-
----
-
-# Q24. Why is Prometheus listening on port 9090?
-
-### Answer
-
-9090 is the default Prometheus web interface.
-
-It allows users to access Prometheus using:
-
-```text
-http://server-ip:9090
-```
-
----
-
-# Q25. Prometheus service isn't starting. How would you troubleshoot?
-
-### Answer
-
-I would:
-
-1. Check service status.
-
-```bash
-sudo systemctl status prometheus
-```
-
-2. Check logs.
-
-```bash
-journalctl -u prometheus
-```
-
-3. Validate the configuration.
-
-```bash
-promtool check config /etc/prometheus/prometheus.yml
-```
-
-4. Verify permissions and binary paths.
-
----
-
-# Q26. A target shows DOWN. What will you check?
-
-### Answer
-
-I would verify:
-
-- Node Exporter service is running
-- Port 9100 is open
-- Security Group allows traffic
-- Firewall rules
-- Target IP is correct
-
----
-
-# Q27. Prometheus shows "Connection Refused". What could be the reason?
-
-### Answer
-
-Possible causes:
-
-- Node Exporter stopped
-- Wrong port
-- Firewall blocking traffic
-- Incorrect target IP
-- Service not running
-
----
-
-# Q28. Prometheus configuration is invalid. How would you check?
-
-### Answer
-
-I would validate the configuration using:
-
-```bash
-promtool check config /etc/prometheus/prometheus.yml
-```
-
-If there are syntax errors, Prometheus will display them.
-
----
-
-# Q29. Metrics are not updating. What would you check?
-
-### Answer
-
-I would verify:
-
-- Target status
-- Scrape interval
-- Exporter health
-- Network connectivity
-- Prometheus configuration
-- Configuration reload status
-
----
-
-# Q30. Why is Node Exporter showing DOWN?
-
-### Answer
-
-Possible reasons include:
-
-- Node Exporter service stopped
-- Wrong target IP
-- Port 9100 blocked
-- Firewall issue
-- Incorrect Prometheus configuration
-
----
-
-# Scenario-Based Questions
-
-## Q31. A server suddenly reaches 100% CPU. How will Prometheus help?
-
-### Answer
-
-Prometheus continuously collects CPU usage metrics. Grafana dashboards will show the spike, and if Alertmanager is configured, notifications can be sent immediately to the operations team.
-
----
-
-## Q32. Prometheus is running, but Grafana dashboards show no data. What will you check?
-
-### Answer
-
-I would check:
-
-- Prometheus service is running
-- Targets are UP
-- Grafana data source configuration
-- Dashboard queries
-- Network connectivity
-
----
-
-## Q33. How would you monitor multiple servers?
-
-### Answer
-
-Install Node Exporter on each server and add each server as a target in `prometheus.yml`.
-
-Prometheus will scrape metrics from all configured targets.
-
----
-
-## Q34. How would you make this monitoring setup production-ready?
-
-### Answer
-
-I would:
-
-- Configure Alertmanager
-- Enable HTTPS
-- Add authentication
-- Use service discovery
-- Configure retention policies
-- Enable persistent storage
-- Back up Grafana dashboards
-- Deploy Prometheus in a highly available architecture
-
----
-
-# Interview Summary
-
-### Technologies Used
-
-- Prometheus
-- Node Exporter
-- Grafana
-- Jenkins Prometheus Metrics Plugin
-
-### Ports Used
-
-| Service | Port |
-|----------|------|
-| Prometheus | 9090 |
-| Grafana | 3000 |
-| Node Exporter | 9100 |
-| Jenkins | 8080 |
-
-### Important Commands
-
-```bash
-sudo systemctl status prometheus
-
+sudo systemctl daemon-reload
 sudo systemctl restart prometheus
-
-promtool check config /etc/prometheus/prometheus.yml
-
-curl -X POST http://localhost:9090/-/reload
 ```
+`daemon-reload` re-reads unit files from disk since systemd caches them in memory; without it, your edits won't take effect even if you restart the service.
 
-### Project Flow
+---
 
-```text
-Linux Server
-      │
-      ▼
-Node Exporter
-      │
-      ▼
-Prometheus
-      │
-      ▼
-Grafana Dashboard
-```
+## Section C: Jenkins & Prometheus Integration
+
+### 16. How does Jenkins expose metrics to Prometheus?
+Via the Prometheus plugin, which exposes metrics on a `/prometheus` HTTP endpoint (instead of the default `/metrics` path many exporters use). This is why the scrape job config uses `metrics_path: '/prometheus'` explicitly, since Prometheus defaults to `/metrics` if not overridden.
+
+### 17. In the Prometheus config, why must `metrics_path` be explicitly set for the Jenkins job but not for Node Exporter?
+Because Prometheus's default `metrics_path` is `/metrics`, which matches Node Exporter's default endpoint. Jenkins's Prometheus plugin exposes data at `/prometheus` instead, so it must be overridden or Prometheus will get a 404 and mark the target down.
+
+### 18. What port is typically used for the Jenkins Prometheus plugin, and how do you find it?
+It uses whatever port Jenkins itself runs on (in this setup, `8080`), since `/prometheus` is just an endpoint under the existing Jenkins web application — not a separate exporter process/port like Node Exporter's 9100.
+
+---
+
+## Section D: Troubleshooting Questions
+
+### 19. Prometheus target shows `DOWN` with error `context deadline exceeded`. What do you check first?
+This indicates a scrape timeout — Prometheus couldn't reach the target within `scrape_timeout`. Check: (1) security group/firewall rules blocking the port, (2) whether the exporter process is actually running (`systemctl status node_exporter`), (3) network connectivity (`curl http://<target-ip>:9100/metrics` from the Prometheus server), and (4) whether `scrape_timeout` is too short for a slow endpoint.
+
+### 20. Target shows `connection refused`. What's the likely cause?
+The port is reachable at the network level, but nothing is listening on it. Likely causes: the exporter service isn't running or crashed, it's bound to `127.0.0.1` instead of `0.0.0.0` (only accepts local connections), or the wrong port was configured in the scrape job.
+
+### 21. `promtool check config` fails after adding a new job. How do you debug it?
+YAML is whitespace/indentation-sensitive, so the most common cause is misaligned indentation under `scrape_configs`. Check: consistent spacing (no tabs), that `job_name`, `static_configs`, and `targets` are nested correctly, and that the new job is a sibling list item to the existing `prometheus` job — not nested inside it.
+
+### 22. You reloaded Prometheus config with `curl -X POST http://localhost:9090/-/reload` but new targets don't show up. Why?
+Possible reasons: (1) `--web.enable-lifecycle` flag wasn't set on Prometheus startup, so the reload endpoint returns 403, (2) the config file has a syntax error that failed silently on reload — check `journalctl -u prometheus` or Prometheus logs for a reload error, (3) you edited the wrong file path (not the one referenced by `--config.file`).
+
+### 23. Grafana dashboard shows "No Data" even though Prometheus targets are UP. How do you troubleshoot?
+Check: (1) the correct data source is selected in the dashboard's panel/variable settings, (2) the PromQL query in the panel matches actual metric names (metric names/labels can differ between exporter versions), (3) the Grafana server's time range isn't outside when data was actually collected, (4) the data source URL/connectivity test in Grafana settings still passes.
+
+### 24. Node Exporter service fails to start with a "permission denied" error on start. What's a likely cause?
+Often caused by binary/directory ownership — if `/usr/local/bins/node_exporter` isn't executable by the `node_exporter` system user, or a flag like `--collector.textfile.collector.directory` points to a path the service user can't read. Fix ownership/permissions or run `sudo chown` and `chmod +x` on the binary.
+
+### 25. Prometheus's disk usage on `/data` is growing rapidly and the disk is nearing capacity. What are your options?
+Options: (1) reduce `--storage.tsdb.retention.time` (default 15 days) to purge old data sooner, (2) reduce scrape frequency (`scrape_interval`) if it's unnecessarily high, (3) move `/data` to a larger volume/disk, (4) offload long-term storage to a remote system like Thanos or Cortex instead of keeping everything locally.
+
+### 26. Jenkins target in Prometheus shows `UP` but the metrics look stale (not updating). What would you check?
+Check the actual `/prometheus` endpoint directly in a browser or via `curl` to see if the numbers change on refresh. If Jenkins itself is fine but not updating, check if the Prometheus plugin has a caching/refresh interval configured, or if Jenkins builds have simply stopped running (many Jenkins Prometheus metrics are build-triggered).
+
+### 27. You restart the monitoring-server instance and Grafana no longer loads on port 3000. Steps to debug?
+1. `sudo systemctl status grafana-server` — check if it's running.
+2. If not enabled at boot, `sudo systemctl enable grafana-server` (a common oversight — enable ≠ currently running after fresh boot if enable was skipped).
+3. Check security group still allows inbound traffic on 3000 (some setups only open ports temporarily for testing).
+4. Check Grafana logs at `/var/log/grafana/grafana.log` for startup errors (e.g., corrupted DB, port conflict).
+
+### 28. Two exporters/services are both trying to bind to the same port. How do you identify and fix this?
+Use `sudo netstat -tulnp | grep <port>` or `sudo ss -tulnp | grep <port>` to see which process holds the port. Either stop the conflicting process or reconfigure one of the services to use a different port via its startup flags (e.g., Node Exporter's `--web.listen-address`).
+
+### 29. After adding the Node Exporter dashboard (ID 1860) in Grafana, some panels show "N/A" for CPU/Memory. What's a common cause?
+Version mismatches between the dashboard template and the running Node Exporter version — some collectors/metric label names change across Node Exporter releases. Fix by using a matching dashboard revision, or edit panel queries to match currently exposed metric names.
+
+### 30. How would you confirm a firewall/security group issue vs. an application-level issue when a target is DOWN?
+From the Prometheus server, run `telnet <target-ip> <port>` or `nc -zv <target-ip> <port>`. If the connection is refused instantly, it's likely application-level (service not listening). If it hangs/times out, it's likely a network/firewall/security-group block.
+
+---
+
+## Section E: Scenario-Based Questions
+
+### 31. Your manager asks you to add monitoring for a new microservice on a different EC2 instance. Walk through the steps.
+1. Install the appropriate exporter (or ensure the app exposes a `/metrics` endpoint) on the new instance.
+2. Open the exporter's port in that instance's security group, scoped to allow traffic only from the monitoring server's IP/SG (not `0.0.0.0/0`).
+3. Add a new `job_name` block under `scrape_configs` in `prometheus.yml` on the monitoring server pointing to `<new-instance-ip>:<port>`.
+4. Run `promtool check config` to validate.
+5. Reload via `curl -X POST http://localhost:9090/-/reload`.
+6. Confirm the target shows `UP` under Status → Targets.
+7. Optionally, build/import a Grafana dashboard for the new service.
+
+### 32. The team wants alerts sent to Slack when a service goes down. How would you extend this setup?
+Add Prometheus's **Alertmanager** component: define alerting rules in Prometheus (e.g., `up == 0` for 5 minutes), point Prometheus to an Alertmanager instance via `--alertmanager.url` / config, and configure Alertmanager's receiver with a Slack webhook URL. Alternatively, Grafana also supports native alerting with Slack contact points if you prefer to manage alerts there instead.
+
+### 33. Your monitoring server itself goes down. How do you get visibility into that (i.e., who monitors the monitor)?
+This is the "monitoring the monitor" problem. Common approaches: run a lightweight external health check (e.g., a separate small instance or a third-party uptime service like UptimeRobot/CloudWatch) that pings the monitoring server's Grafana/Prometheus port, or run a secondary Prometheus in HA/federation mode to cross-monitor.
+
+### 34. A new team member accidentally deletes the `prometheus.yml` file. What's your recovery approach, and how would you prevent this in the future?
+Recovery: if backed up (e.g., in version control or an AMI snapshot), restore from there. If not, you'd need to reconstruct scrape configs manually. Prevention: store `prometheus.yml` in a Git repo, use configuration management (Ansible/Terraform) to manage it declaratively, and restrict file permissions so only necessary users/service accounts can modify it.
+
+### 35. You need to onboard 20 new servers into monitoring without manually editing `prometheus.yml` each time. What's a better approach?
+Use **service discovery** (e.g., `ec2_sd_config` for AWS, or `file_sd_config` pointing to a dynamically-generated targets file) instead of static configs. This auto-discovers new instances based on tags/labels, removing the need for manual YAML edits per host.
+
+### 36. Leadership asks: "Can we see historical trends from 6 months ago?" but your Prometheus retention is only 15 days. How do you respond/solve this?
+Explain that Prometheus's local TSDB isn't designed for long-term storage by default. Solution: increase `--storage.tsdb.retention.time` (if disk allows), or better, integrate a remote long-term storage backend like Thanos, Cortex, or VictoriaMetrics via `remote_write`, which are built for durable, long-retention storage separate from local disk.
+
+### 37. During an incident, Grafana dashboards are slow to load and timing out. How do you approach diagnosing this?
+Check: (1) Prometheus query load/CPU — a heavy or unoptimized PromQL query (e.g., high-cardinality label matching without proper aggregation) can slow things down, (2) Grafana server resource usage itself, (3) network latency between Grafana and Prometheus, (4) whether too many panels with short refresh intervals are querying simultaneously. Start by checking Prometheus's own `/metrics` for query duration stats.
+
+### 38. Security flags that Prometheus, Grafana, and Jenkins ports are all open to `0.0.0.0/0` in the security group. How do you remediate without breaking monitoring?
+Restrict security group rules: Grafana (3000) can stay open to internal/office IP ranges or behind a VPN/bastion for user access; Prometheus (9090) and Node Exporter (9100) should only allow traffic from the monitoring server's own SG/IP (since only Prometheus needs to scrape those, and only Grafana needs to hit Prometheus) — not from the public internet.
+
+### 39. You're asked to justify why the team should adopt Prometheus + Grafana over a paid SaaS monitoring tool (e.g., Datadog) for a small team. What points would you raise?
+Points to raise: no per-host/per-metric licensing costs at this scale, full control over data (self-hosted), highly customizable via PromQL and open dashboard templates, strong ecosystem/community exporters for almost any technology. Trade-offs to also mention honestly: more operational overhead (you manage HA, storage, upgrades yourself), no built-in long-term storage or advanced ML-based anomaly detection out of the box.
+
+### 40. A colleague suggests skipping the dedicated `prometheus`/`node_exporter` system users and just running everything as root "to save time." How do you respond?
+Push back on this: running as root violates least-privilege and increases blast radius if the exporter has a vulnerability (Node Exporter, for instance, has had CVEs in the past). It also breaks the convention systemd best-practices expect. The setup cost of `useradd --system --no-create-home --shell /bin/false` is trivial compared to the security risk, so it's worth doing correctly even under time pressure.
+
+---
+
+## Section F: Additional Likely Questions (Gaps Not Covered Above)
+
+These are commonly asked alongside the above and fill in angles not yet covered — comparisons, "why this port/tool" framing, and a couple more scenario questions.
+
+### 41. Why did you choose Prometheus over AWS CloudWatch?
+CloudWatch is tightly coupled to AWS and works well for AWS-native resource metrics, but it's less flexible for custom application metrics, has per-metric/API-call costs that scale with usage, and its query language is far more limited than PromQL. Prometheus is open-source, cloud-agnostic (useful if the setup ever moves off AWS or becomes multi-cloud), has a much larger exporter ecosystem (Node Exporter, Jenkins plugin, etc.), and integrates natively with Grafana for richer visualization. CloudWatch is still reasonable to mention as a good fit for pure AWS-managed-service metrics (RDS, ELB, Lambda) — the two aren't mutually exclusive, and some teams run both.
+
+### 42. What is a "job" in Prometheus, as distinct from a "target"?
+A job is a logical grouping of one or more targets that serve the same purpose (e.g., `job_name: 'node_exporter'`). A target is one specific scrape endpoint (`ip:port`) within that job. In this setup, the `node_exporter` job could later contain multiple targets if more servers were added, all labeled under the same job name for easy querying/filtering in PromQL (e.g., `up{job="node_exporter"}`).
+
+### 43. What exactly is "scraping" in Prometheus terms?
+Scraping is the act of Prometheus making an HTTP GET request to a target's metrics endpoint (e.g., `http://ip:9100/metrics`) at a fixed interval (`scrape_interval`, default 15s/1m), parsing the plain-text response, and storing each metric as a time-series data point with a timestamp.
+
+### 44. What is `prometheus.yml` and what are its main sections?
+It's Prometheus's main configuration file, in YAML format, located at `/etc/prometheus/prometheus.yml` in this setup. Its main sections are: `global` (default scrape/evaluation intervals), `scrape_configs` (the list of jobs/targets to scrape — where Node Exporter and Jenkins jobs were added), and optionally `rule_files` and `alerting` (for recording/alerting rules and Alertmanager config, not used in this basic setup).
+
+### 45. Why does Prometheus run on port 9090 specifically — is that a hard requirement?
+9090 is just Prometheus's documented default (set via `--web.listen-address=0.0.0.0:9090` in the service file) — not a hard technical requirement. It's a convention the community follows so anyone familiar with Prometheus knows where to find it. It can be changed to any free port via that same flag, but there's little reason to unless it conflicts with something else.
+
+### 46. Why does Node Exporter run on port 9100 — same question, is it fixed?
+Same idea — 9100 is Node Exporter's documented default port, not hardcoded/mandatory. It's a widely respected convention across the Prometheus exporter ecosystem (e.g., MySQL exporter defaults to 9104, blackbox exporter to 9115) specifically so multiple exporters can coexist on one host without manual port negotiation. It can be overridden with the `--web.listen-address` flag if needed.
+
+### 47. What does the raw output at a target's `/metrics` endpoint actually look like?
+It's plain text in Prometheus's exposition format — each line is either a `# HELP`/`# TYPE` comment describing a metric, or a metric line like `node_cpu_seconds_total{cpu="0",mode="idle"} 12345.67`. It's human-readable and can be viewed directly with `curl http://<ip>:9100/metrics`, which is often the fastest way to confirm an exporter is alive and producing data before even checking Prometheus's UI.
+
+### 48. Why is Grafana considered more suitable for production dashboards than Prometheus's own UI?
+Prometheus's built-in expression browser is meant for ad-hoc debugging/queries, not for persistent, shareable, role-based dashboards. Grafana adds: saved dashboards with version history, panel-level visualizations (heatmaps, gauges, tables — not just line graphs), user access control, alerting with multiple notification channels, and the ability to combine multiple data sources (Prometheus, logs, databases) on one dashboard — none of which Prometheus's UI is designed to do.
+
+### 49. Scenario: CPU on a monitored server suddenly spikes to 100%. Walk through how you'd investigate using this stack.
+1. Notice the spike via the Grafana Node Exporter dashboard (CPU panel) or a Prometheus alert if one's configured.
+2. In Prometheus/Grafana, query `node_cpu_seconds_total` broken down by `mode` (user/system/iowait) to see what kind of load it is — e.g., high `iowait` points to disk issues rather than a runaway process.
+3. Correlate the timestamp of the spike with any deploys, cron jobs, or Jenkins builds running around that time (cross-reference the Jenkins dashboard).
+4. SSH into the actual server and run `top`/`htop` to identify the specific offending process in real time, since Node Exporter gives system-wide numbers, not per-process breakdowns (that would need something like `process-exporter` for finer detail).
+5. Once resolved, consider adding a Prometheus alerting rule (e.g., `node_load1 > threshold for 5m`) so it's caught automatically next time instead of noticed manually.
+
+### 50. Scenario: How would you confirm from Prometheus alone (without logging into the Jenkins server) that Jenkins is down?
+Check the `up` metric for that job in the Prometheus expression browser: `up{job="jenkins"}`. A value of `0` confirms Prometheus itself can't reach it (scrape failing), and the Targets page (Status → Targets) will show the specific error (connection refused, timeout, etc.) which narrows down whether it's Jenkins itself crashing, the host being down, or a network/security-group block — all without needing shell access to the Jenkins box first.
