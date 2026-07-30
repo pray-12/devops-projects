@@ -1,0 +1,3211 @@
+---
+title: EKS Cluster Setup Interview Questions
+description: Amazon EKS Cluster Setup Interview Questions & Answers
+---
+
+# Amazon EKS Cluster Setup Interview Questions (Q1–Q8)
+
+---
+
+# Q1. Why did you choose Amazon EKS for your project?
+
+## Answer
+
+I chose **Amazon EKS (Elastic Kubernetes Service)** because it is a **managed Kubernetes service** provided by AWS. Instead of setting up and managing the Kubernetes control plane myself, AWS manages it automatically.
+
+For my project, I already had the application running in Docker containers. The next step was to deploy it on Kubernetes for better scalability and availability. Since the project was hosted on AWS, EKS was the most suitable choice.
+
+### Why EKS?
+
+- Managed Kubernetes service
+- High Availability Control Plane
+- Automatic upgrades and patching
+- Integration with AWS services
+- Easier cluster management
+- Production-ready
+
+### In my project
+
+My CI pipeline pushed Docker images to DockerHub. ArgoCD then deployed those images into my Amazon EKS cluster.
+
+---
+
+# Q2. Why do we need kubectl, eksctl, and AWS CLI?
+
+## Answer
+
+All three tools have different responsibilities.
+
+### kubectl
+
+**What?**
+
+The Kubernetes command-line tool.
+
+**Why?**
+
+It communicates with the Kubernetes API Server to manage cluster resources.
+
+Examples:
+
+```bash
+kubectl get nodes
+kubectl get pods
+kubectl apply -f deployment.yaml
+kubectl delete pod <pod-name>
+```
+
+---
+
+### eksctl
+
+**What?**
+
+A CLI tool specifically designed to create and manage EKS clusters.
+
+**Why?**
+
+Without eksctl, we would need to manually create:
+
+- VPC
+- IAM Roles
+- Security Groups
+- EKS Cluster
+- Node Groups
+- CloudFormation Stacks
+
+eksctl automates all these steps.
+
+Example:
+
+```bash
+eksctl create cluster --name=kastrocluster
+```
+
+---
+
+### AWS CLI
+
+**What?**
+
+Command-line tool to communicate with AWS services.
+
+**Why?**
+
+Used for authentication and managing AWS resources.
+
+Example:
+
+```bash
+aws configure
+```
+
+It stores:
+
+- Access Key
+- Secret Key
+- Region
+- Output Format
+
+---
+
+### Interview Tip
+
+A common interview question is:
+
+**Why can't we create an EKS cluster using only kubectl?**
+
+Answer:
+
+Because **kubectl only manages Kubernetes resources after a cluster exists.** It cannot create AWS infrastructure like VPCs, IAM roles, or EC2 instances. That is handled by `eksctl` or the AWS Console.
+
+---
+
+# Q3. What happens during `aws configure`?
+
+## Answer
+
+`aws configure` connects your local machine to your AWS account.
+
+Command:
+
+```bash
+aws configure
+```
+
+It asks for:
+
+```
+AWS Access Key ID
+AWS Secret Access Key
+Default Region
+Output Format
+```
+
+Example:
+
+```
+AWS Access Key ID : ****************
+AWS Secret Access Key : ****************
+Region : ap-south-1
+Output : json
+```
+
+These values are stored locally under:
+
+```
+~/.aws/credentials
+~/.aws/config
+```
+
+After configuration, tools like:
+
+- AWS CLI
+- eksctl
+- Terraform
+
+can authenticate with AWS automatically.
+
+---
+
+### Why is it required?
+
+Without AWS credentials:
+
+- EKS cluster creation fails
+- EC2 creation fails
+- IAM creation fails
+
+because AWS doesn't know who is making the request.
+
+---
+
+# Q4. Explain the `eksctl create cluster` command.
+
+Command:
+
+```bash
+eksctl create cluster \
+--name=kastrocluster \
+--region=ap-northeast-1 \
+--zones=ap-northeast-1a,ap-northeast-1c \
+--without-nodegroup
+```
+
+---
+
+### --name
+
+Specifies the cluster name.
+
+```
+kastrocluster
+```
+
+AWS creates an EKS cluster with this name.
+
+---
+
+### --region
+
+Specifies where the cluster will be created.
+
+Example:
+
+```
+ap-northeast-1
+```
+
+This means Tokyo Region.
+
+---
+
+### --zones
+
+Specifies Availability Zones.
+
+Example:
+
+```
+ap-northeast-1a
+ap-northeast-1c
+```
+
+Using multiple AZs improves High Availability.
+
+---
+
+### --without-nodegroup
+
+Creates only the Control Plane.
+
+No worker nodes are created.
+
+Worker nodes will be added later.
+
+---
+
+### Why create the cluster without node groups?
+
+Because it gives more flexibility.
+
+After verifying the cluster, we can create customized node groups with:
+
+- desired instance type
+- auto scaling
+- IAM permissions
+- storage
+
+---
+
+# Q5. Why did you create the cluster without a node group?
+
+## Answer
+
+The command:
+
+```bash
+--without-nodegroup
+```
+
+creates only the Kubernetes Control Plane.
+
+The worker nodes are added later.
+
+### Advantages
+
+- Better customization
+- Separate IAM Roles
+- Custom EC2 instance types
+- Easier scaling
+- Independent management
+
+This follows AWS best practices.
+
+---
+
+### In my project
+
+I first created the Control Plane.
+
+After that I:
+
+- Associated OIDC
+- Created Managed Node Groups
+- Installed ArgoCD
+- Installed Node Exporter
+
+---
+
+# Q6. What is the Kubernetes Control Plane in EKS?
+
+## Answer
+
+The Control Plane is the brain of Kubernetes.
+
+AWS manages it for us.
+
+It is responsible for:
+
+- Scheduling Pods
+- Maintaining cluster state
+- API Server
+- etcd Database
+- Controller Manager
+- Scheduler
+
+Unlike self-managed Kubernetes, AWS automatically:
+
+- patches it
+- upgrades it
+- monitors it
+- provides high availability
+
+---
+
+### Components
+
+- API Server
+- etcd
+- Scheduler
+- Controller Manager
+
+---
+
+### Interview Question
+
+**Can we SSH into the Control Plane?**
+
+No.
+
+AWS manages it completely.
+
+Users only manage worker nodes.
+
+---
+
+# Q7. How do you verify the EKS cluster is created successfully?
+
+## Answer
+
+First:
+
+```bash
+eksctl get cluster
+```
+
+Expected output:
+
+```
+NAME
+kastrocluster
+```
+
+---
+
+Check nodes:
+
+```bash
+kubectl get nodes
+```
+
+Expected:
+
+```
+Ready
+Ready
+```
+
+---
+
+Check namespaces:
+
+```bash
+kubectl get ns
+```
+
+---
+
+Check system pods:
+
+```bash
+kubectl get pods -A
+```
+
+---
+
+Also verify in AWS Console:
+
+```
+AWS Console
+↓
+
+EKS
+↓
+
+Clusters
+↓
+
+kastrocluster
+```
+
+Status should be:
+
+```
+Active
+```
+
+---
+
+# Q8. What AWS resources are created automatically during EKS cluster creation?
+
+## Answer
+
+When using `eksctl`, several AWS resources are created automatically.
+
+These include:
+
+- EKS Cluster
+- CloudFormation Stack
+- VPC (if not existing)
+- Internet Gateway
+- Route Tables
+- Security Groups
+- IAM Roles
+- Control Plane
+- Load Balancer components
+- Elastic Network Interfaces (ENIs)
+
+Later, when Node Groups are created:
+
+- EC2 Instances
+- Auto Scaling Group
+- Launch Template
+- EBS Volumes
+
+---
+
+### Why is this useful?
+
+Without `eksctl`, we would need to manually create and configure all these resources, which is time-consuming and error-prone.
+
+---
+
+# Common Follow-up Interview Questions
+
+### Why did you choose EKS over ECS?
+
+Because my application required Kubernetes features such as Deployments, Services, Ingress, ArgoCD, and Helm.
+
+---
+
+### Why EKS instead of self-managed Kubernetes?
+
+AWS manages the Control Plane, reducing operational overhead while providing high availability and automatic upgrades.
+
+---
+
+### Can kubectl create an EKS cluster?
+
+No.
+
+kubectl manages Kubernetes resources **inside** an existing cluster. It cannot provision AWS infrastructure.
+
+---
+
+### What happens if one Availability Zone goes down?
+
+Since the control plane is spread across multiple Availability Zones, the cluster remains available. Worker nodes in the affected AZ may become unavailable, but workloads can continue running on healthy nodes in other AZs if configured accordingly.
+
+---
+title: EKS Node Groups, IAM OIDC & IRSA Interview Questions
+description: Amazon EKS Node Groups, IAM OIDC Provider and IRSA Interview Questions & Answers
+---
+
+# Amazon EKS Node Groups, IAM OIDC & IRSA Interview Questions (Q9–Q16)
+
+---
+
+# Q9. What is an IAM OIDC Provider?
+
+## Answer
+
+An **IAM OIDC (OpenID Connect) Provider** establishes a trust relationship between your **Amazon EKS cluster** and **AWS IAM**.
+
+Normally, Kubernetes Service Accounts are only recognized inside the Kubernetes cluster. AWS IAM has no knowledge of these accounts.
+
+By associating an OIDC provider, AWS can trust identities coming from Kubernetes, allowing Pods to securely access AWS services without embedding AWS credentials.
+
+### Why is it needed?
+
+Without an OIDC provider:
+
+- Pods cannot assume IAM Roles.
+- Applications would need hardcoded AWS Access Keys (which is insecure).
+
+With OIDC:
+
+- Pods can securely obtain temporary AWS credentials.
+- No secrets need to be stored inside containers.
+
+---
+
+### Command
+
+```bash
+eksctl utils associate-iam-oidc-provider \
+--region ap-northeast-1 \
+--cluster kastrocluster \
+--approve
+```
+
+---
+
+### In my project
+
+I associated the OIDC provider immediately after creating the EKS cluster so that Kubernetes workloads could later use IAM Roles if they needed access to AWS services.
+
+---
+
+# Q10. Why do we associate an IAM OIDC Provider?
+
+## Answer
+
+We associate an IAM OIDC Provider so that Kubernetes Service Accounts can securely authenticate with AWS IAM.
+
+This enables **IAM Roles for Service Accounts (IRSA)**.
+
+### Without OIDC
+
+```
+Pod
+ ↓
+Needs AWS S3
+
+No authentication available
+
+Access Denied
+```
+
+---
+
+### With OIDC
+
+```
+Pod
+↓
+
+Service Account
+↓
+
+OIDC Provider
+↓
+
+IAM Role
+↓
+
+AWS Services
+```
+
+The Pod receives temporary credentials instead of long-term AWS Access Keys.
+
+---
+
+### Benefits
+
+- Improved security
+- Temporary credentials
+- No hardcoded secrets
+- Fine-grained permissions
+- AWS best practice
+
+---
+
+# Q11. What is IAM Roles for Service Accounts (IRSA)?
+
+## Answer
+
+IRSA allows a Kubernetes Service Account to assume a specific AWS IAM Role.
+
+Instead of giving every worker node broad permissions, you assign only the required permissions to individual Pods.
+
+### Example
+
+Suppose your application needs to access:
+
+- Amazon S3
+- DynamoDB
+
+Instead of attaching those permissions to the EC2 node, you create:
+
+```
+Service Account
+↓
+
+IAM Role
+
+↓
+
+S3 Read Access
+```
+
+Only Pods using that Service Account receive the permissions.
+
+---
+
+### Why use IRSA?
+
+- Least privilege principle
+- Better security
+- No AWS keys inside Pods
+- Temporary credentials
+- Easier auditing
+
+---
+
+### Interview Tip
+
+A common question is:
+
+**Can multiple Pods use different IAM Roles?**
+
+Yes.
+
+Each Pod can use a different Kubernetes Service Account, and each Service Account can be mapped to a different IAM Role.
+
+---
+
+# Q12. Explain the Node Group creation command line by line.
+
+Command:
+
+```bash
+eksctl create nodegroup \
+--cluster=kastrocluster \
+--region=ap-northeast-1 \
+--name=kastrodemo-ng-public1 \
+--node-type=t3.medium \
+--nodes=2 \
+--nodes-min=2 \
+--nodes-max=4 \
+--node-volume-size=20 \
+--ssh-access \
+--ssh-public-key=Prajwal \
+--managed \
+--asg-access \
+--external-dns-access \
+--full-ecr-access \
+--appmesh-access \
+--alb-ingress-access
+```
+
+---
+
+### --cluster
+
+Specifies which EKS cluster this node group belongs to.
+
+```
+kastrocluster
+```
+
+---
+
+### --region
+
+AWS region where the nodes will be launched.
+
+```
+ap-northeast-1
+```
+
+---
+
+### --name
+
+Defines the Node Group name.
+
+```
+kastrodemo-ng-public1
+```
+
+---
+
+### --node-type
+
+Specifies the EC2 instance type.
+
+```
+t3.medium
+```
+
+---
+
+### Why t3.medium?
+
+It provides:
+
+- 2 vCPUs
+- 4 GB RAM
+
+Suitable for small Kubernetes workloads and learning environments.
+
+---
+
+### --nodes
+
+Initial number of worker nodes.
+
+```
+2
+```
+
+---
+
+### --nodes-min
+
+Minimum nodes maintained by Auto Scaling.
+
+```
+2
+```
+
+---
+
+### --nodes-max
+
+Maximum nodes Auto Scaling can create.
+
+```
+4
+```
+
+---
+
+### --node-volume-size
+
+Size of the EC2 root EBS volume.
+
+```
+20 GB
+```
+
+---
+
+### --ssh-access
+
+Enables SSH access to worker nodes.
+
+Useful for troubleshooting.
+
+---
+
+### --ssh-public-key
+
+Specifies the EC2 Key Pair.
+
+```
+Prajwal
+```
+
+---
+
+### --managed
+
+Creates an AWS Managed Node Group.
+
+AWS manages:
+
+- upgrades
+- health checks
+- lifecycle
+- replacements
+
+---
+
+### Additional IAM Flags
+
+```
+--asg-access
+```
+
+Allows interaction with Auto Scaling Groups.
+
+```
+--external-dns-access
+```
+
+Allows ExternalDNS to update Route53.
+
+```
+--full-ecr-access
+```
+
+Allows pulling images from Amazon ECR.
+
+```
+--appmesh-access
+```
+
+Provides permissions for AWS App Mesh.
+
+```
+--alb-ingress-access
+```
+
+Allows the AWS Load Balancer Controller to create ALBs.
+
+---
+
+# Q13. Why did you choose Managed Node Groups?
+
+## Answer
+
+Managed Node Groups reduce operational effort because AWS manages the worker nodes.
+
+AWS automatically handles:
+
+- Node provisioning
+- Updates
+- Health checks
+- Replacements
+- Integration with Auto Scaling
+
+### Advantages
+
+- Easier maintenance
+- High availability
+- Automated upgrades
+- Better integration with AWS
+
+---
+
+### Self-managed vs Managed
+
+| Self-managed | Managed |
+|--------------|----------|
+| Manual upgrades | Automatic |
+| Manual replacement | Automatic |
+| More maintenance | Less maintenance |
+| Higher operational overhead | Lower operational overhead |
+
+---
+
+# Q14. Why did you choose t3.medium?
+
+## Answer
+
+I selected **t3.medium** because it provides a good balance of CPU, memory, and cost for a learning and demonstration environment.
+
+Specifications:
+
+- 2 vCPUs
+- 4 GB RAM
+
+It is sufficient for:
+
+- Kubernetes worker nodes
+- Small application Pods
+- ArgoCD
+- Node Exporter
+- Basic monitoring
+
+For production workloads, larger instance types may be required based on application demand.
+
+---
+
+# Q15. Explain the additional add-on flags.
+
+## Answer
+
+These flags automatically attach the required IAM permissions to the Node Group.
+
+### --asg-access
+
+Allows Kubernetes components to interact with Auto Scaling Groups.
+
+---
+
+### --external-dns-access
+
+Allows ExternalDNS to create and update Route53 DNS records.
+
+---
+
+### --full-ecr-access
+
+Allows worker nodes to pull container images from Amazon ECR.
+
+---
+
+### --appmesh-access
+
+Provides permissions for AWS App Mesh service mesh integration.
+
+---
+
+### --alb-ingress-access
+
+Allows the AWS Load Balancer Controller to create and manage Application Load Balancers (ALBs).
+
+---
+
+### Why are these useful?
+
+Without the required IAM permissions, Kubernetes controllers would not be able to interact with AWS services.
+
+---
+
+# Q16. How do worker nodes join the EKS cluster?
+
+## Answer
+
+After the Node Group is created, each EC2 instance automatically joins the cluster.
+
+The process is:
+
+```
+EC2 Instance Starts
+        ↓
+Bootstrap Script Runs
+        ↓
+kubelet Starts
+        ↓
+Authenticates with EKS Control Plane
+        ↓
+Registers as a Worker Node
+        ↓
+Status becomes Ready
+```
+
+You can verify this using:
+
+```bash
+kubectl get nodes
+```
+
+Example:
+
+```
+NAME                                   STATUS
+ip-192-168-29-199                      Ready
+ip-192-168-46-71                       Ready
+```
+
+Once the nodes are in the **Ready** state, Kubernetes can schedule Pods on them.
+
+---
+
+# Common Troubleshooting Questions
+
+## Worker nodes are not joining the cluster. What would you check?
+
+- Verify the Node Group was created successfully.
+- Check the EC2 instances are running.
+- Ensure the IAM Role is attached correctly.
+- Verify Security Groups allow communication with the control plane.
+- Check subnet configuration.
+- Review the bootstrap logs on the EC2 instance.
+
+---
+
+## Why is the node status `NotReady`?
+
+Possible causes include:
+
+- kubelet service is not running.
+- Networking issues.
+- CNI plugin failure.
+- Resource constraints.
+- IAM or authentication problems.
+
+---
+
+## What happens if one worker node fails?
+
+Kubernetes detects the failure and reschedules Pods onto healthy worker nodes, provided sufficient capacity exists.
+
+---
+
+## Can we increase the number of worker nodes later?
+
+Yes.
+
+You can:
+
+- Update the Auto Scaling Group size.
+- Use `eksctl scale nodegroup`.
+- Configure the Cluster Autoscaler for automatic scaling.
+
+---
+
+# Interview Tips
+
+- Clearly distinguish the **Control Plane** (managed by AWS) from **Worker Nodes** (where Pods run).
+- Understand why **OIDC** is required before **IRSA** can be used.
+- Be able to explain every important flag in the `eksctl create nodegroup` command.
+- Know that **Managed Node Groups** reduce maintenance compared to self-managed nodes.
+- Mention security best practices such as using **temporary IAM credentials through IRSA instead of storing AWS Access Keys in Pods**.
+
+---
+title: ArgoCD & GitOps Interview Questions
+description: Complete ArgoCD and GitOps Interview Questions with What, Why, Architecture, Troubleshooting and Scenario Based Questions
+---
+
+# 03 - ArgoCD & GitOps Interview Questions
+
+---
+
+# Section 1 - GitOps Fundamentals
+
+---
+
+# Q1. What is GitOps?
+
+## Answer
+
+GitOps is a deployment methodology where Git acts as the **single source of truth** for Kubernetes deployments.
+
+Instead of manually running deployment commands like:
+
+```bash
+kubectl apply -f deployment.yaml
+```
+
+we store all Kubernetes manifests inside a Git repository.
+
+ArgoCD continuously monitors that repository.
+
+Whenever a change is committed, ArgoCD automatically synchronizes the Kubernetes cluster with Git.
+
+---
+
+### Traditional Deployment
+
+```
+Developer
+     ↓
+kubectl apply
+     ↓
+Kubernetes
+```
+
+Deployment depends on engineers manually applying YAML files.
+
+---
+
+### GitOps Deployment
+
+```
+Developer
+      ↓
+GitHub Repository
+      ↓
+ArgoCD
+      ↓
+Kubernetes Cluster
+```
+
+Git becomes the desired state of the cluster.
+
+---
+
+### In my project
+
+After Jenkins completed the CI pipeline:
+
+- Source code was built.
+- Docker image was created.
+- Docker image was pushed to DockerHub.
+
+The CD part started here.
+
+ArgoCD watched my Kubernetes repository.
+
+When I updated the deployment.yaml image tag, ArgoCD detected the change and deployed the new version automatically.
+
+---
+
+# Q2. Why did you use ArgoCD?
+
+## Answer
+
+Jenkins can deploy applications, but I wanted to follow the GitOps approach.
+
+ArgoCD provides:
+
+- Automatic synchronization
+- Rollback capability
+- Drift detection
+- Deployment history
+- Kubernetes-native deployments
+- Web UI
+- Health monitoring
+
+---
+
+### Why not only Jenkins?
+
+If Jenkins deploys directly:
+
+```
+Jenkins
+     ↓
+kubectl apply
+```
+
+The cluster state may change without Git knowing.
+
+---
+
+With ArgoCD:
+
+```
+GitHub
+      ↓
+ArgoCD
+      ↓
+Cluster
+```
+
+Git always represents the desired state.
+
+This is considered a best practice for Kubernetes deployments.
+
+---
+
+# Q3. What is the difference between CI and CD in your project?
+
+## Answer
+
+My project was divided into two parts.
+
+### Continuous Integration (CI)
+
+Handled by Jenkins.
+
+Pipeline:
+
+```
+GitHub
+↓
+
+Jenkins
+
+↓
+
+SonarQube
+
+↓
+
+Quality Gate
+
+↓
+
+OWASP
+
+↓
+
+Trivy
+
+↓
+
+Docker Build
+
+↓
+
+DockerHub
+```
+
+CI ends after the Docker image is pushed.
+
+---
+
+### Continuous Deployment (CD)
+
+Handled by ArgoCD.
+
+Pipeline:
+
+```
+DockerHub
+↓
+
+Git Repository (deployment.yaml)
+
+↓
+
+ArgoCD
+
+↓
+
+EKS Cluster
+```
+
+ArgoCD continuously watches Git and deploys updates automatically.
+
+---
+
+# Q4. Why didn't you use Jenkins for deployment?
+
+## Answer
+
+Jenkins supports deployment, but it is primarily a CI tool.
+
+ArgoCD is specifically designed for Kubernetes deployments using GitOps.
+
+Advantages of ArgoCD:
+
+- Declarative deployments
+- Automatic synchronization
+- Drift detection
+- Rollbacks
+- Deployment history
+- Kubernetes-native architecture
+
+Using Jenkins for deployment would require maintaining deployment scripts.
+
+ArgoCD eliminates that complexity.
+
+---
+
+# Q5. Explain the GitOps workflow in your project.
+
+## Answer
+
+The workflow was:
+
+```
+Developer
+
+↓
+
+GitHub Source Code
+
+↓
+
+Jenkins Pipeline
+
+↓
+
+Docker Image
+
+↓
+
+DockerHub
+
+↓
+
+Update deployment.yaml
+
+↓
+
+GitHub Kubernetes Repository
+
+↓
+
+ArgoCD detects change
+
+↓
+
+Deploys to Amazon EKS
+```
+
+ArgoCD continuously compares:
+
+Desired State (Git)
+
+vs
+
+Actual State (Cluster)
+
+If differences exist, ArgoCD synchronizes them automatically.
+
+---
+
+# Q6. What problem does GitOps solve?
+
+## Answer
+
+GitOps solves configuration drift.
+
+Without GitOps:
+
+```
+Engineer A
+
+kubectl edit deployment
+```
+
+The cluster changes, but Git does not.
+
+Later:
+
+```
+Engineer B
+
+kubectl apply deployment.yaml
+```
+
+The cluster changes again.
+
+Nobody knows the actual configuration.
+
+---
+
+With GitOps:
+
+```
+Git
+
+↓
+
+Single Source of Truth
+
+↓
+
+ArgoCD
+
+↓
+
+Cluster
+```
+
+Everything is version-controlled.
+
+Every deployment is traceable.
+
+---
+
+# Q7. What is ArgoCD?
+
+## Answer
+
+ArgoCD is an open-source Continuous Delivery tool built specifically for Kubernetes.
+
+It monitors Git repositories and automatically deploys Kubernetes manifests to clusters.
+
+---
+
+Main features:
+
+- GitOps deployment
+- Auto Sync
+- Rollback
+- Health monitoring
+- Deployment history
+- Drift detection
+- Web UI
+- RBAC support
+
+---
+
+# Q8. Why is ArgoCD called Declarative?
+
+## Answer
+
+In declarative deployment we describe:
+
+"What the cluster should look like."
+
+Example:
+
+```yaml
+replicas: 2
+
+image: pray12/zomato-app:latest
+```
+
+We never tell Kubernetes HOW to create Pods.
+
+We only define the desired state.
+
+ArgoCD ensures the cluster always matches this desired state.
+
+---
+
+# Q9. What is Drift Detection?
+
+## Answer
+
+Drift means:
+
+Actual cluster configuration differs from Git.
+
+Example:
+
+Git:
+
+```
+replicas: 2
+```
+
+Someone manually scales:
+
+```
+kubectl scale deployment zomato --replicas=5
+```
+
+Now:
+
+Git
+
+```
+2 replicas
+```
+
+Cluster
+
+```
+5 replicas
+```
+
+ArgoCD detects this difference.
+
+If Auto Sync is enabled,
+
+ArgoCD changes the cluster back to 2 replicas.
+
+---
+
+# Q10. Explain ArgoCD Architecture.
+
+## Answer
+
+Architecture:
+
+```
+Developer
+
+↓
+
+GitHub Repository
+
+↓
+
+ArgoCD API Server
+
+↓
+
+Application Controller
+
+↓
+
+Repository Server
+
+↓
+
+Redis
+
+↓
+
+Kubernetes Cluster
+```
+
+### API Server
+
+Provides:
+
+- Web UI
+- REST API
+- Authentication
+
+---
+
+### Repository Server
+
+Clones Git repositories.
+
+Reads:
+
+- deployment.yaml
+- service.yaml
+- ingress.yaml
+
+---
+
+### Application Controller
+
+Compares:
+
+Desired State (Git)
+
+Actual State (Cluster)
+
+Performs synchronization.
+
+---
+
+### Redis
+
+Caches application information for better performance.
+
+---
+
+### Kubernetes Cluster
+
+Receives manifests and creates:
+
+- Pods
+- Deployments
+- Services
+- Ingress
+
+---
+
+## Interview Tip
+
+A common follow-up question is:
+
+**What component actually deploys resources?**
+
+Answer:
+
+The **Application Controller** is responsible for comparing Git with the cluster and applying the required changes.
+
+---
+title: 04 - Prometheus EKS Monitoring Interview Questions (Part 4)
+description: Kubernetes Monitoring Interview Questions with Prometheus, Node Exporter, Helm, Troubleshooting and Metrics
+---
+
+# File 4 - Prometheus EKS Monitoring Interview Questions
+
+## Section 4 - Kubernetes Monitoring
+
+---
+
+# Q25. Why do we need to monitor Kubernetes?
+
+## Answer
+
+Kubernetes automatically manages applications, but it **doesn't tell us whether the cluster or applications are healthy** unless we monitor it.
+
+Monitoring helps us detect issues before they affect users.
+
+### Without Monitoring
+
+```
+User
+   │
+   ▼
+Application becomes slow
+   │
+Nobody knows why
+```
+
+Problems may remain unnoticed until users complain.
+
+---
+
+### With Monitoring
+
+```
+Node Exporter
+       │
+       ▼
+Prometheus
+       │
+       ▼
+Grafana Dashboard
+       │
+       ▼
+DevOps Engineer
+```
+
+You can continuously observe:
+
+- CPU usage
+- Memory usage
+- Disk usage
+- Network traffic
+- Pod health
+- Node health
+
+---
+
+### In My Project
+
+After deploying the Zomato application on Amazon EKS, I monitored:
+
+- Worker node CPU utilization
+- Memory usage
+- Disk usage
+- Network traffic
+- Node availability
+- Jenkins metrics
+- Prometheus health
+
+This helped verify that both the infrastructure and application were running correctly.
+
+---
+
+### Interview Tip
+
+A common follow-up question is:
+
+**Can Kubernetes work without monitoring?**
+
+Yes.
+
+But in production, monitoring is essential for detecting failures, capacity planning, troubleshooting, and alerting.
+
+---
+
+# Q26. Why did you install Node Exporter using Helm?
+
+## Answer
+
+Helm is the package manager for Kubernetes.
+
+Instead of manually creating:
+
+- Deployment YAML
+- Service YAML
+- ServiceAccount
+- RBAC
+- ConfigMaps
+
+Helm installs all required Kubernetes resources automatically.
+
+---
+
+### Manual Installation
+
+```
+Deployment.yaml
+
+Service.yaml
+
+Role.yaml
+
+RoleBinding.yaml
+
+ServiceAccount.yaml
+```
+
+Many files need to be maintained.
+
+---
+
+### Using Helm
+
+```bash
+helm install prometheus-node-exporter \
+prometheus-community/prometheus-node-exporter \
+--namespace prometheus-node-exporter
+```
+
+One command installs everything.
+
+---
+
+### Advantages
+
+- Faster installation
+- Official maintained chart
+- Easy upgrades
+- Easy rollback
+- Version management
+- Best practices included
+
+---
+
+### In My Project
+
+I added the Prometheus Helm repository:
+
+```bash
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+```
+
+Then installed Node Exporter using:
+
+```bash
+helm install prometheus-node-exporter prometheus-community/prometheus-node-exporter \
+--namespace prometheus-node-exporter
+```
+
+This deployed Node Exporter across the Kubernetes cluster without writing any YAML files.
+
+---
+
+# Q27. Why create a separate namespace for Node Exporter?
+
+## Answer
+
+Namespaces logically separate applications inside Kubernetes.
+
+Instead of deploying everything into the **default namespace**, it's considered best practice to isolate monitoring components.
+
+---
+
+### Example
+
+```
+default
+
+├── Zomato Pods
+├── Services
+└── Deployments
+```
+
+Monitoring components mixed with application resources become difficult to manage.
+
+---
+
+Better approach:
+
+```
+default
+│
+├── Application
+
+argocd
+│
+├── ArgoCD Components
+
+prometheus-node-exporter
+│
+├── Node Exporter Pods
+```
+
+---
+
+### Benefits
+
+- Better organization
+- Easier troubleshooting
+- Easier RBAC management
+- Cleaner resource separation
+- Safer deletion
+
+---
+
+### Command Used
+
+```bash
+kubectl create namespace prometheus-node-exporter
+```
+
+---
+
+### Interview Tip
+
+Namespaces do **not** provide complete security.
+
+They provide **logical isolation**, while security is enforced using RBAC and Network Policies.
+
+---
+
+# Q28. Why add a Prometheus scrape job?
+
+## Answer
+
+Prometheus collects metrics only from targets defined in **prometheus.yml**.
+
+Adding a scrape job tells Prometheus **what to monitor**.
+
+Example:
+
+```yaml
+- job_name: 'k8s'
+  metrics_path: /metrics
+  static_configs:
+    - targets:
+      - 3.110.xxx.xxx:9100
+```
+
+---
+
+### Components
+
+**job_name**
+
+Logical name displayed in Prometheus UI.
+
+---
+
+**metrics_path**
+
+Endpoint exposing metrics.
+
+Usually:
+
+```
+/metrics
+```
+
+---
+
+**targets**
+
+Server to scrape.
+
+Example:
+
+```
+Node Exporter
+
+↓
+
+3.110.xxx.xxx:9100
+```
+
+---
+
+### Without Scrape Job
+
+```
+Node Exporter
+
+↓
+
+Prometheus
+
+❌ Doesn't know it exists
+```
+
+---
+
+### With Scrape Job
+
+```
+Node Exporter
+
+↓
+
+Prometheus
+
+↓
+
+Metrics Stored
+```
+
+---
+
+### In My Project
+
+I edited:
+
+```bash
+sudo vi /etc/prometheus/prometheus.yml
+```
+
+Added:
+
+```yaml
+- job_name: 'k8s'
+  metrics_path: /metrics
+  static_configs:
+    - targets:
+      - '<NodePublicIP>:9100'
+```
+
+Reloaded Prometheus.
+
+Node metrics immediately became available.
+
+---
+
+# Q29. How does Prometheus scrape node metrics?
+
+## Answer
+
+Prometheus follows a **pull model**.
+
+It periodically sends HTTP requests to Node Exporter.
+
+---
+
+Flow:
+
+```
+Prometheus
+
+↓
+
+GET /metrics
+
+↓
+
+Node Exporter
+
+↓
+
+Returns Metrics
+
+↓
+
+Prometheus Stores Metrics
+```
+
+---
+
+Example response:
+
+```
+node_cpu_seconds_total
+
+node_memory_MemAvailable_bytes
+
+node_network_receive_bytes_total
+
+node_filesystem_avail_bytes
+```
+
+Thousands of metrics are returned.
+
+---
+
+Prometheus stores these values inside its Time Series Database (TSDB).
+
+---
+
+### Why Pull Instead of Push?
+
+Advantages:
+
+- Simpler architecture
+- Easier service discovery
+- Better scalability
+- No agents need to push data
+
+---
+
+### Interview Tip
+
+Follow-up question:
+
+**Can Prometheus receive pushed metrics?**
+
+Yes.
+
+Using **Pushgateway**.
+
+It is mainly used for short-lived batch jobs.
+
+Node Exporter always uses the pull model.
+
+---
+
+# Q30. Why does Node Exporter use port 9100?
+
+## Answer
+
+9100 is the default HTTP port exposed by Node Exporter.
+
+When installed, Node Exporter starts an HTTP server.
+
+```
+Node Exporter
+
+↓
+
+http://NodeIP:9100/metrics
+```
+
+Prometheus accesses this endpoint to collect metrics.
+
+---
+
+Example:
+
+```bash
+curl http://3.110.xxx.xxx:9100/metrics
+```
+
+Returns:
+
+```
+node_cpu_seconds_total
+
+node_memory_MemAvailable_bytes
+
+node_load1
+```
+
+---
+
+### In My Project
+
+I opened port **9100** in the EC2 Security Group so Prometheus running on the monitoring server could access the metrics endpoint.
+
+If this port is blocked:
+
+```
+Prometheus
+
+↓
+
+Connection Refused
+
+↓
+
+Target DOWN
+```
+
+---
+
+# Q31. Why reload Prometheus instead of restarting it?
+
+## Answer
+
+After modifying **prometheus.yml**, Prometheus must reload the configuration.
+
+Instead of restarting the service, we used:
+
+```bash
+curl -X POST http://localhost:9090/-/reload
+```
+
+---
+
+### Why reload?
+
+- No downtime
+- Existing metrics remain available
+- Faster than restarting
+- Configuration changes are applied immediately
+
+---
+
+### Restart
+
+```
+Prometheus
+
+↓
+
+Stops
+
+↓
+
+Starts Again
+
+↓
+
+Temporary Monitoring Gap
+```
+
+---
+
+### Reload
+
+```
+Prometheus
+
+↓
+
+Reads Updated Configuration
+
+↓
+
+Continues Running
+```
+
+---
+
+### Why did this work?
+
+Because Prometheus was started with:
+
+```bash
+--web.enable-lifecycle
+```
+
+This enables the reload API.
+
+Without it, the reload request would fail.
+
+---
+
+# Q32. Explain the complete monitoring flow in your project.
+
+## Answer
+
+The monitoring architecture was:
+
+```
+Amazon EKS Worker Nodes
+            │
+            │
+            ▼
+     Node Exporter
+            │
+            │ HTTP (/metrics)
+            ▼
+      Prometheus Server
+            │
+            │ PromQL Queries
+            ▼
+      Grafana Dashboard
+            │
+            ▼
+      DevOps Engineer
+```
+
+---
+
+### Step 1
+
+Node Exporter collects:
+
+- CPU usage
+- Memory usage
+- Disk usage
+- Filesystem usage
+- Network statistics
+- Load Average
+
+---
+
+### Step 2
+
+Prometheus scrapes metrics every few seconds using the configured scrape jobs.
+
+---
+
+### Step 3
+
+Metrics are stored in Prometheus TSDB.
+
+---
+
+### Step 4
+
+Grafana connects to Prometheus as its data source.
+
+---
+
+### Step 5
+
+Grafana dashboards visualize:
+
+- CPU utilization
+- Memory utilization
+- Disk usage
+- Network traffic
+- Node availability
+- Kubernetes node health
+
+---
+
+## Troubleshooting
+
+### Problem 1
+
+**Target Status = DOWN**
+
+Possible reasons:
+
+- Port 9100 blocked
+- Node Exporter stopped
+- Wrong IP in prometheus.yml
+- Security Group issue
+- Firewall blocking traffic
+
+---
+
+### Problem 2
+
+**No Metrics in Grafana**
+
+Check:
+
+- Prometheus Data Source
+- Prometheus Target Status
+- Dashboard variables
+- PromQL query
+- Prometheus service
+
+---
+
+### Problem 3
+
+**Prometheus Configuration Error**
+
+Run:
+
+```bash
+promtool check config /etc/prometheus/prometheus.yml
+```
+
+Always validate the configuration before reloading.
+
+---
+
+## Important Metrics You Should Know
+
+| Metric | Purpose |
+|---------|----------|
+| node_cpu_seconds_total | CPU usage |
+| node_memory_MemAvailable_bytes | Available RAM |
+| node_memory_MemTotal_bytes | Total RAM |
+| node_load1 | 1-minute load average |
+| node_filesystem_avail_bytes | Free disk space |
+| node_network_receive_bytes_total | Incoming network traffic |
+| node_network_transmit_bytes_total | Outgoing network traffic |
+| node_disk_read_bytes_total | Disk reads |
+| node_disk_written_bytes_total | Disk writes |
+| up | Whether the target is reachable (1 = UP, 0 = DOWN) |
+
+---
+
+## Interview Summary
+
+After these questions, you should be able to explain:
+
+- Why Kubernetes monitoring is important
+- Why Helm simplifies Node Exporter installation
+- Why namespaces are used
+- How Prometheus discovers targets
+- How scraping works
+- Why port 9100 is required
+- Why configuration reload is preferred over restart
+- The complete monitoring architecture used in your EKS project
+
+---
+title: 05 - EKS Troubleshooting & Scenario Interview Questions
+description: Real-world EKS, ArgoCD, Kubernetes and Prometheus troubleshooting interview questions with production best practices.
+---
+
+# 05 - EKS Troubleshooting & Scenario Interview Questions
+
+---
+
+# Q33. ArgoCD shows **OutOfSync**. How would you troubleshoot and fix it?
+
+## Answer
+
+OutOfSync means the **desired state in Git** is different from the **actual state running in the Kubernetes cluster**.
+
+It doesn't necessarily mean something is broken—it simply means the cluster doesn't match Git.
+
+---
+
+### Example
+
+Git Repository
+
+```
+Replicas: 2
+
+Image:
+pray12/zomato-app:v2
+```
+
+Cluster
+
+```
+Replicas: 3
+
+Image:
+pray12/zomato-app:v1
+```
+
+ArgoCD compares both states and reports:
+
+```
+OutOfSync
+```
+
+---
+
+## Troubleshooting Steps
+
+### Step 1
+
+Check the application status.
+
+```bash
+kubectl get applications -n argocd
+```
+
+or through the ArgoCD UI.
+
+---
+
+### Step 2
+
+Open the application in ArgoCD.
+
+It highlights exactly which resources differ.
+
+For example:
+
+```
+Deployment
+
+↓
+
+Image differs
+```
+
+or
+
+```
+Replicas differ
+```
+
+---
+
+### Step 3
+
+Check Git.
+
+Verify:
+
+- deployment.yaml
+- service.yaml
+- ingress.yaml
+
+Make sure the latest commit contains the expected configuration.
+
+---
+
+### Step 4
+
+Check whether someone manually modified the cluster.
+
+For example:
+
+```bash
+kubectl scale deployment zomato --replicas=5
+```
+
+This causes configuration drift.
+
+---
+
+### Step 5
+
+Synchronize the application.
+
+Either:
+
+```
+ArgoCD UI
+
+↓
+
+SYNC
+```
+
+or
+
+```bash
+argocd app sync zomato
+```
+
+---
+
+### Root Causes
+
+- Manual kubectl changes
+- Git repository updated
+- Failed synchronization
+- Wrong image tag
+- Deleted resources
+
+---
+
+### Interview Tip
+
+**OutOfSync** means:
+
+> Git and Kubernetes are different.
+
+It does **not** always mean the application is unhealthy.
+
+---
+
+# Q34. Your Pods are showing **ImagePullBackOff**. How do you troubleshoot?
+
+## Answer
+
+ImagePullBackOff means Kubernetes failed to download the container image.
+
+---
+
+## Step 1
+
+Describe the Pod.
+
+```bash
+kubectl describe pod <pod-name>
+```
+
+Example:
+
+```
+Failed to pull image
+
+repository does not exist
+```
+
+---
+
+## Step 2
+
+Verify the image name.
+
+Incorrect
+
+```yaml
+image: pray12/zomato
+```
+
+Correct
+
+```yaml
+image: pray12/zomato-app:latest
+```
+
+This was the exact issue I encountered in my project.
+
+---
+
+## Step 3
+
+Verify DockerHub.
+
+Check:
+
+```
+https://hub.docker.com
+```
+
+Ensure:
+
+- Repository exists
+- Image exists
+- Tag exists
+
+---
+
+## Step 4
+
+Verify the tag.
+
+Wrong
+
+```
+latest1
+```
+
+Correct
+
+```
+latest
+```
+
+---
+
+## Step 5
+
+If the repository is private,
+
+configure an ImagePullSecret.
+
+---
+
+## Commands
+
+```bash
+kubectl get pods
+
+kubectl describe pod <pod>
+
+kubectl logs <pod>
+```
+
+---
+
+### My Project
+
+Initially I wrote:
+
+```yaml
+pray12/zomato
+```
+
+instead of
+
+```yaml
+pray12/zomato-app
+```
+
+After correcting deployment.yaml and pushing it to GitHub, ArgoCD synchronized the application and the Pods entered the **Running** state.
+
+---
+
+# Q35. Prometheus target shows **DOWN**. What would you check?
+
+## Answer
+
+A DOWN target means Prometheus cannot scrape metrics.
+
+---
+
+## Step 1
+
+Open
+
+```
+Status
+
+↓
+
+Targets
+```
+
+Locate the failed target.
+
+---
+
+## Step 2
+
+Verify Node Exporter.
+
+```bash
+systemctl status node_exporter
+```
+
+---
+
+## Step 3
+
+Test manually.
+
+```bash
+curl http://NodeIP:9100/metrics
+```
+
+If metrics appear,
+
+Node Exporter is healthy.
+
+---
+
+## Step 4
+
+Verify Security Groups.
+
+Port
+
+```
+9100
+```
+
+must be open.
+
+---
+
+## Step 5
+
+Check prometheus.yml.
+
+```yaml
+targets:
+
+- NodeIP:9100
+```
+
+Wrong IP causes DOWN status.
+
+---
+
+## Step 6
+
+Reload Prometheus.
+
+```bash
+promtool check config /etc/prometheus/prometheus.yml
+
+curl -X POST http://localhost:9090/-/reload
+```
+
+---
+
+### Common Causes
+
+- Wrong IP
+- Firewall
+- Security Group
+- Node Exporter stopped
+- Wrong port
+
+---
+
+# Q36. Application is deployed but not accessible. How would you troubleshoot?
+
+## Answer
+
+This is one of the most common Kubernetes interview questions.
+
+---
+
+## Step 1
+
+Check Pods.
+
+```bash
+kubectl get pods
+```
+
+Pods should be
+
+```
+Running
+```
+
+---
+
+## Step 2
+
+Check Deployment.
+
+```bash
+kubectl get deployment
+```
+
+Verify
+
+```
+READY
+
+AVAILABLE
+```
+
+---
+
+## Step 3
+
+Check Service.
+
+```bash
+kubectl get svc
+```
+
+Verify:
+
+- Service type
+- Port
+- TargetPort
+- NodePort
+
+---
+
+## Step 4
+
+Check Endpoints.
+
+```bash
+kubectl get endpoints
+```
+
+Empty endpoints indicate the Service cannot find Pods.
+
+Usually caused by mismatched labels.
+
+---
+
+## Step 5
+
+Check labels.
+
+Deployment
+
+```yaml
+labels:
+
+app: zomato
+```
+
+Service
+
+```yaml
+selector:
+
+app: zomato
+```
+
+They must match.
+
+---
+
+## Step 6
+
+Check Security Groups.
+
+If using NodePort,
+
+ensure:
+
+```
+30001
+
+or
+
+30080
+```
+
+is open.
+
+---
+
+### My Project
+
+Initially the application was inaccessible because Pods were in **ImagePullBackOff**.
+
+Once the image name was corrected, the Service automatically routed traffic to healthy Pods.
+
+---
+
+# Q37. Node Exporter isn't showing metrics. How would you troubleshoot?
+
+## Answer
+
+---
+
+## Step 1
+
+Check Pod.
+
+```bash
+kubectl get pods -n prometheus-node-exporter
+```
+
+---
+
+## Step 2
+
+Describe Pod.
+
+```bash
+kubectl describe pod
+```
+
+---
+
+## Step 3
+
+Verify Service.
+
+```bash
+kubectl get svc
+```
+
+---
+
+## Step 4
+
+Verify Endpoint.
+
+```bash
+curl http://NodeIP:9100/metrics
+```
+
+---
+
+## Step 5
+
+Verify Prometheus Target.
+
+```
+Status
+
+↓
+
+Targets
+```
+
+---
+
+## Step 6
+
+Reload configuration.
+
+```bash
+curl -X POST http://localhost:9090/-/reload
+```
+
+---
+
+## Possible Causes
+
+- Pod CrashLoopBackOff
+- Wrong scrape target
+- Wrong namespace
+- Wrong port
+- Security Group blocked
+
+---
+
+# Q38. AWS LoadBalancer is stuck in Pending. What would you do?
+
+## Answer
+
+A LoadBalancer Service requires AWS to provision an Elastic Load Balancer.
+
+---
+
+## Check
+
+```bash
+kubectl get svc
+```
+
+If:
+
+```
+EXTERNAL-IP
+
+Pending
+```
+
+then troubleshoot.
+
+---
+
+### Possible Causes
+
+- No worker nodes
+- Wrong subnet
+- IAM permissions missing
+- Cloud Controller issue
+- AWS quota exceeded
+
+---
+
+### Commands
+
+```bash
+kubectl describe svc
+```
+
+Check Events.
+
+---
+
+Verify:
+
+```
+kubectl get nodes
+```
+
+Nodes should be
+
+```
+Ready
+```
+
+---
+
+### Verify IAM
+
+For EKS,
+
+ensure:
+
+- OIDC configured
+- NodeGroup IAM role
+- ALB permissions
+
+---
+
+### My Project
+
+After patching:
+
+```bash
+kubectl patch svc argocd-server
+```
+
+AWS provisioned an ELB successfully and I accessed ArgoCD through the generated DNS name.
+
+---
+
+# Q39. Pods remain in Pending state. How do you troubleshoot?
+
+## Answer
+
+Pending means Kubernetes hasn't scheduled the Pod yet.
+
+---
+
+## Step 1
+
+Describe Pod.
+
+```bash
+kubectl describe pod
+```
+
+---
+
+## Common Reasons
+
+### No Worker Nodes
+
+```bash
+kubectl get nodes
+```
+
+---
+
+### Insufficient CPU
+
+Worker node lacks CPU resources.
+
+---
+
+### Insufficient Memory
+
+Worker node lacks RAM.
+
+---
+
+### Taints
+
+Node rejects scheduling.
+
+---
+
+### PVC Waiting
+
+Persistent Volume unavailable.
+
+---
+
+### ImagePullSecret missing
+
+Private image cannot be pulled.
+
+---
+
+## Commands
+
+```bash
+kubectl describe pod
+
+kubectl get events
+
+kubectl get nodes
+```
+
+---
+
+## Interview Tip
+
+Pending means
+
+> Scheduler hasn't successfully placed the Pod.
+
+It is different from:
+
+```
+CrashLoopBackOff
+
+Running
+
+ImagePullBackOff
+```
+
+---
+
+# Q40. How would you make this project production-ready?
+
+## Answer
+
+The project demonstrates the complete DevOps lifecycle, but production environments require additional improvements.
+
+---
+
+## 1. Private Container Registry
+
+Instead of DockerHub,
+
+use:
+
+- Amazon ECR
+
+Benefits:
+
+- Better security
+- IAM integration
+- Faster image pulls
+- No DockerHub rate limits
+
+---
+
+## 2. HTTPS
+
+Install:
+
+- AWS Load Balancer Controller
+- ACM Certificates
+
+Expose applications over HTTPS.
+
+---
+
+## 3. Ingress
+
+Instead of NodePort,
+
+use:
+
+```
+Internet
+
+↓
+
+ALB
+
+↓
+
+Ingress
+
+↓
+
+Service
+
+↓
+
+Pods
+```
+
+---
+
+## 4. High Availability
+
+Increase replicas.
+
+```yaml
+replicas: 3
+```
+
+Deploy Pods across multiple Availability Zones.
+
+---
+
+## 5. Autoscaling
+
+Enable
+
+HPA
+
+(Horizontal Pod Autoscaler)
+
+Scale Pods automatically based on CPU or Memory.
+
+---
+
+## 6. Monitoring
+
+Already implemented:
+
+- Prometheus
+- Grafana
+- Node Exporter
+
+Add:
+
+- Alertmanager
+- Slack Alerts
+- Email Notifications
+
+---
+
+## 7. Logging
+
+Centralize logs using:
+
+- Fluent Bit
+- Fluentd
+- Loki
+- ELK Stack
+
+---
+
+## 8. Secrets Management
+
+Avoid storing secrets inside YAML.
+
+Use:
+
+- Kubernetes Secrets
+- AWS Secrets Manager
+
+---
+
+## 9. Image Security
+
+Integrate:
+
+- Trivy
+- Docker Scout
+
+Block deployments if Critical vulnerabilities exist.
+
+---
+
+## 10. GitOps Best Practices
+
+Enable:
+
+- Auto Sync
+- Self Heal
+- Prune
+
+Everything should be managed from Git.
+
+---
+
+## Final Production Architecture
+
+```
+Developer
+
+↓
+
+GitHub
+
+↓
+
+Jenkins CI
+
+↓
+
+SonarQube
+
+↓
+
+OWASP
+
+↓
+
+Trivy
+
+↓
+
+Docker Build
+
+↓
+
+Amazon ECR
+
+↓
+
+GitHub (Kubernetes Manifests)
+
+↓
+
+ArgoCD
+
+↓
+
+Amazon EKS
+
+↓
+
+Ingress (ALB)
+
+↓
+
+Service
+
+↓
+
+Pods
+
+↓
+
+Prometheus
+
+↓
+
+Grafana
+
+↓
+
+Alertmanager
+```
+
+---
+
+# Interview Summary
+
+By completing this file, you should confidently answer interview questions on:
+
+- ArgoCD OutOfSync
+- ImagePullBackOff
+- Prometheus Target DOWN
+- Application inaccessible after deployment
+- Node Exporter troubleshooting
+- AWS LoadBalancer Pending
+- Pods stuck in Pending
+- Production-ready Kubernetes architecture
+
+These are among the most frequently asked troubleshooting and scenario-based questions for DevOps and Kubernetes interviews.
