@@ -1,0 +1,19 @@
+I implemented an end-to-end DevSecOps CI/CD pipeline for a Zomato web application on AWS. The objective was to automate the complete software delivery process—from code commit to deployment on Kubernetes—with integrated security scanning and monitoring.
+
+The project started with the application source code stored in GitHub. Whenever developers pushed changes, a GitHub webhook automatically triggered a Jenkins pipeline.
+
+In the CI stage, Jenkins cloned the repository, built the application, and performed multiple quality and security checks. I integrated SonarQube for static code analysis, OWASP Dependency Check to identify vulnerable third-party libraries, and Trivy to scan both the source code and Docker image for vulnerabilities. If the quality gate failed or critical issues were detected, the pipeline stopped automatically.
+
+After all validations passed, Jenkins built a Docker image, tagged it, and pushed it to Docker Hub.
+
+Instead of deploying directly from Jenkins, I followed the GitOps approach. Jenkins updated the Kubernetes deployment manifest in a separate Git repository with the latest Docker image tag. ArgoCD continuously monitored this Git repository and automatically synchronized the changes to an Amazon EKS cluster.
+
+The application was deployed on EKS using Kubernetes Deployment and Service manifests. The Deployment maintained the desired number of replicas, while the NodePort Service exposed the application externally.
+
+For monitoring, I configured Prometheus on a separate monitoring server. Node Exporter collected infrastructure metrics such as CPU, memory, disk usage, and network statistics from both the monitoring server and Kubernetes worker nodes. Prometheus scraped these metrics periodically, and Grafana visualized them through dashboards for infrastructure and Jenkins monitoring.
+
+During the implementation, I encountered several real-world issues such as Docker permission errors in Jenkins, SonarQube webhook configuration problems, ImagePullBackOff caused by an incorrect Docker image name, Prometheus scrape target failures, and OWASP Dependency Check delays. Troubleshooting these issues gave me practical experience in debugging CI/CD pipelines and Kubernetes deployments.
+
+Overall, this project helped me understand how CI, GitOps-based CD, Kubernetes, security scanning, and monitoring integrate to build a production-style DevOps workflow.
+
+This project gave me practical experience across the complete DevOps lifecycle. Rather than learning individual tools in isolation, I understood how they work together—from source code management and automated CI, to GitOps-based deployments on Kubernetes, and finally monitoring the application and infrastructure using Prometheus and Grafana. I also gained hands-on troubleshooting experience with Jenkins, Docker, Kubernetes, ArgoCD, SonarQube, and Prometheus, which significantly improved my understanding of real-world DevOps workflows.
